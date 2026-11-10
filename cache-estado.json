@@ -1,0 +1,469 @@
+{
+ "278293": {
+  "ts": 1794344019357,
+  "det": {
+   "curso": "PROCESO DE SOFTWARE",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "278300": {
+  "ts": 1794344038602,
+  "det": {
+   "curso": "PROCESO DE SOFTWARE",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "278306": {
+  "ts": 1794344011052,
+  "det": {
+   "curso": "PROCESO DE SOFTWARE",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "278319": {
+  "ts": 1794344030814,
+  "det": {
+   "curso": "PROCESO DE SOFTWARE",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "278331": {
+  "ts": 1794343995477,
+  "det": {
+   "curso": "PROCESO DE SOFTWARE",
+   "enviado": true,
+   "calificada": true,
+   "nota": "100",
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "278338": {
+  "ts": 1794344029795,
+  "det": {
+   "curso": "PROCESO DE SOFTWARE",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296883": {
+  "ts": 1794343985349,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296884": {
+  "ts": 1794343982889,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296885": {
+  "ts": 1794343984523,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296890": {
+  "ts": 1794344033289,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296891": {
+  "ts": 1794343986681,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296896": {
+  "ts": 1794343988072,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296897": {
+  "ts": 1794343992109,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296898": {
+  "ts": 1794343989341,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296905": {
+  "ts": 1794343990675,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296906": {
+  "ts": 1794343993442,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296907": {
+  "ts": 1794344002394,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296913": {
+  "ts": 1794344004004,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296914": {
+  "ts": 1794344007376,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296915": {
+  "ts": 1794344006160,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296921": {
+  "ts": 1794344020476,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296922": {
+  "ts": 1794344021601,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296923": {
+  "ts": 1794344022846,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "296931": {
+  "ts": 1794344031947,
+  "det": {
+   "curso": "ESTRUCTURA DE DATOS",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312533": {
+  "ts": 1794344000814,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312539": {
+  "ts": 1794343981341,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": true,
+   "freno": "La tarea fue enviada 1 día 8 horas después de la fecha límite"
+  }
+ },
+ "312541": {
+  "ts": 1794344013367,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312542": {
+  "ts": 1794344024162,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312544": {
+  "ts": 1794344004911,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": true,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312545": {
+  "ts": 1794343997325,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312550": {
+  "ts": 1794343999682,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312551": {
+  "ts": 1794343998858,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312553": {
+  "ts": 1794344012074,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312554": {
+  "ts": 1794344028667,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312556": {
+  "ts": 1794344008618,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312557": {
+  "ts": 1794344009618,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312564": {
+  "ts": 1794344037392,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312565": {
+  "ts": 1794344036133,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312574": {
+  "ts": 1794344014432,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312575": {
+  "ts": 1794344025184,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312584": {
+  "ts": 1794344016796,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312585": {
+  "ts": 1794344026635,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312594": {
+  "ts": 1794344016789,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312595": {
+  "ts": 1794344034839,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "312604": {
+  "ts": 1794344018024,
+  "det": {
+   "curso": "ESTADÍSTICA II"
+  }
+ },
+ "312605": {
+  "ts": 1794344027441,
+  "det": {
+   "curso": "ESTADÍSTICA II",
+   "enviado": false,
+   "calificada": false,
+   "nota": null,
+   "tarde": false,
+   "freno": null
+  }
+ },
+ "323928": {
+  "ts": 1794344040143,
+  "det": {
+   "curso": "REDES DE COMPUTADORAS"
+  }
+ }
+}

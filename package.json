@@ -1,0 +1,13 @@
+{
+  "name": "calendario-campus-ug",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "description": "Tablero del calendario de tareas del Campus Virtual U. Guayaquil (Moodle)",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

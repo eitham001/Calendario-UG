@@ -1,0 +1,539 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Calendario — Campus Virtual UG</title>
+<style>
+:root{
+  --bg:#f1f4f9; --panel:#fff; --ink:#1e2430; --muted:#68738a; --line:#e4e8f0;
+  --azul:#2257bf; --azul-osc:#1b4597;
+  --pendiente:#e0a800; --pendiente-bg:#fdf5e0;
+  --enviada:#1a7f4e; --enviada-bg:#e3f4eb;
+  --calificada:#2257bf; --calificada-bg:#e6eefc;
+  --vencida:#c23b3b; --vencida-bg:#fbe7e7; --vencida-brd:#ecbcbc;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Segoe UI",system-ui,sans-serif;background:var(--bg);color:var(--ink);min-height:100vh}
+header{background:linear-gradient(120deg,var(--azul-osc),var(--azul));color:#fff;padding:18px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+header h1{font-size:1.25rem;font-weight:600;letter-spacing:.2px}
+header .sub{display:block;font-size:.78rem;opacity:.75;font-weight:400;margin-top:2px}
+header .spacer{flex:1}
+button{font:inherit;cursor:pointer;border:0;border-radius:10px}
+.boton{background:rgba(255,255,255,.16);color:#fff;padding:8px 16px;font-size:.85rem}
+.boton:hover{background:rgba(255,255,255,.28)}
+.boton.solid{background:#fff;color:var(--azul);font-weight:600}
+.boton:disabled{opacity:.55;cursor:default}
+main{max-width:1180px;margin:0 auto;padding:22px 20px 50px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 3px rgba(20,30,60,.05)}
+#panel-cal{flex:1;min-width:540px;order:1;overflow:hidden}
+#panel-lista{width:min(375px,34vw);flex:none;order:3;display:none;position:sticky;top:14px;overflow:auto;max-height:min(78vh,900px)}
+body.lista #panel-lista{display:block}
+main>.panel.detalle{order:4;flex-basis:100%}
+@media (max-width:1100px){ #panel-cal{min-width:420px} #panel-lista{width:300px} }
+
+/* barra de mes + filtros */
+.barra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px}
+.barra .mes{font-size:1.05rem;font-weight:700;text-transform:capitalize}
+.nav-btn{background:var(--bg);color:var(--ink);padding:7px 14px;font-size:.95rem}
+.nav-btn:hover{background:#e5eaf4}
+.filtros{display:flex;gap:6px;flex-wrap:wrap;margin-left:8px}
+#estado-carga{font-size:.78rem;color:var(--muted);font-style:italic}
+
+/* ── botones por estado y por curso ── */
+.btn-row{display:flex;gap:6px;flex-wrap:wrap;padding:0 18px 8px}
+.b-estado,.b-curso{font:inherit;font-size:.78rem;font-weight:600;padding:5px 13px;border-radius:999px;cursor:pointer;background:var(--bg);border:1px solid var(--line);color:var(--ink)}
+.b-estado:hover,.b-curso:hover{filter:brightness(.94)}
+.b-estado[data-e="pendiente"]{background:var(--pendiente-bg);border-color:#eed98f;color:#8a6100}
+.b-estado[data-e="atrasada"]{background:#f6ebd8;border-color:#d9bd82;color:#8a5a00}
+.b-estado[data-e="enviada"]{background:var(--enviada-bg);border-color:#bfe4cf;color:var(--enviada)}
+.b-estado[data-e="calificada"]{background:var(--calificada-bg);border-color:#c3d5f5;color:var(--calificada)}
+.b-estado[data-e="vencida"]{background:var(--vencida-bg);border-color:var(--vencida-brd);color:var(--vencida)}
+.b-curso{background:#eaf0fb;border-color:#d3def2;color:var(--azul-osc)}
+.tag.atrasada{background:#f6ebd8;color:#8a5a00}
+
+/* ── pestañas de vista (calendario, estados, cursos) ── */
+.tabs{display:flex;gap:6px;max-width:1180px;margin:0 auto;padding:14px 20px 0;flex-wrap:wrap}
+.tab{font:inherit;font-size:.85rem;padding:8px 14px;border-radius:10px 10px 0 0;background:#dde4f0;border:1px solid var(--line);border-bottom:0;color:var(--muted);cursor:pointer;display:flex;gap:9px;align-items:center}
+.tab.activa{background:var(--panel);color:var(--ink);font-weight:600;border-color:#cfdaee;margin-bottom:-1px}
+.tab .barra-tab{width:8px;height:8px;border-radius:50%;flex:none}
+.tab .x{font-size:.7rem;color:var(--muted);padding:1px 3px;border-radius:5px}
+.tab .x:hover{color:var(--vencida);background:#f3dcdc}
+
+/* ── vista de lista de tareas ── */
+#panel-vista{flex:1;order:1;padding:6px 4px 10px}
+.v-cabecera{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;padding:14px 18px 8px}
+.v-cabecera h2{font-size:1.05rem}
+.v-cabecera .desc{color:var(--muted);font-size:.8rem}
+.v-cuerpo{padding:2px 8px}
+.v-item{display:flex;gap:10px;align-items:flex-start;padding:9px 14px 9px 18px;border-bottom:1px solid var(--line);cursor:pointer}
+.v-item:last-child{border-bottom:0}
+.v-item:hover{background:#f6f8fc}
+.v-item .barrita{width:4.5px;align-self:stretch;border-radius:3px;flex:none}
+.v-item[data-e="pendiente"] .barrita{background:var(--pendiente)}
+.v-item[data-e="atrasada"] .barrita{background:#b06a00}
+.v-item[data-e="enviada"] .barrita{background:var(--enviada)}
+.v-item[data-e="calificada"] .barrita{background:var(--calificada)}
+.v-item[data-e="vencida"] .barrita{background:var(--vencida)}
+.v-item .info{flex:1;min-width:0}
+.v-item .t{font-weight:600;font-size:.83rem;line-height:1.3}
+.v-item .t:hover{color:var(--azul)}
+.v-item .m{font-size:.72rem;color:var(--muted);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap}
+.v-item .m .n{color:var(--azul);font-weight:700}
+.chip{border:1.5px solid var(--line);background:#fff;color:var(--muted);padding:5px 12px;border-radius:999px;font-size:.78rem;transition:.15s}
+.chip .n{font-weight:700;margin-left:3px}
+.chip.activa{color:#fff}
+.chip[data-f="todos"].activa{background:var(--ink);border-color:var(--ink)}
+.chip[data-f="pendiente"].activa{background:var(--pendiente);border-color:var(--pendiente)}
+.chip[data-f="enviada"].activa{background:var(--enviada);border-color:var(--enviada)}
+.chip[data-f="calificada"].activa{background:var(--calificada);border-color:var(--calificada)}
+.chip[data-f="vencida"].activa{background:var(--vencida);border-color:var(--vencida)}
+
+/* calendario */
+.grid{width:100%;table-layout:fixed;border-collapse:separate;border-spacing:0;padding:0 18px 18px}
+.grid th{font-size:.7rem;text-transform:uppercase;letter-spacing:.8px;color:var(--muted);padding:8px 4px;text-align:center;font-weight:600}
+.grid td{vertical-align:top;border:1px solid var(--line);width:14.28%;height:96px;padding:5px 6px;background:#fff}
+.grid td.vacio{background:#fafbfd}
+.grid td.hoy{background:#eef3ff;border-color:#b9cbf3}
+.grid td.sel{outline:2.5px solid var(--azul);outline-offset:-2px;background:#f5f8ff}
+.dia-num{font-size:.8rem;font-weight:700;color:var(--muted);display:inline-block;min-width:20px;padding:1px 4px;border-radius:7px}
+td.hoy .dia-num{background:var(--azul);color:#fff}
+td.hoyno{cursor:pointer}
+.ev{display:block;font-size:.68rem;line-height:1.25;padding:2px 6px;border-radius:6px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border:1px solid transparent}
+.ev:hover{filter:brightness(.93)}
+.ev[data-e="pendiente"]{background:var(--pendiente-bg);color:#8a6100;border-color:#f0dca3}
+.ev[data-e="enviada"]{background:var(--enviada-bg);color:var(--enviada);border-color:#bfe4cf}
+.ev[data-e="calificada"]{background:var(--calificada-bg);color:var(--calificada);border-color:#c3d5f5}
+.ev[data-e="vencida"]{background:var(--vencida-bg);color:var(--vencida);border-color:var(--vencida-brd)}
+.tmp{font-size:2.5rem;color:#9aa6bd;text-align:center;padding:60px 0;font-family:monospace}
+
+/* panel de detalle del día */
+.detalle{margin-top:4px;padding:18px 20px}
+.detalle h2{font-size:1rem;margin-bottom:4px;text-transform:capitalize}
+.detalle .fecha-larga{color:var(--muted);font-size:.82rem;margin-bottom:12px}
+.tarea{display:flex;gap:14px;align-items:flex-start;border:1px solid var(--line);border-radius:12px;padding:13px 16px;margin-top:10px}
+.tarea:hover{border-color:#c9d4ea}
+.indicador{width:5px;align-self:stretch;border-radius:4px;flex:none}
+.tarea[data-e="pendiente"] .indicador{background:var(--pendiente)}
+.tarea[data-e="enviada"] .indicador{background:var(--enviada)}
+.tarea[data-e="calificada"] .indicador{background:var(--calificada)}
+.tarea[data-e="vencida"] .indicador{background:var(--vencida)}
+.tarea .info{flex:1;min-width:0}
+.tarea .nombre{font-weight:600;font-size:.92rem;line-height:1.35;cursor:pointer}
+.tarea .nombre:hover{color:var(--azul);text-decoration:underline}
+.tarea .meta{display:flex;gap:12px;flex-wrap:wrap;color:var(--muted);font-size:.75rem;margin-top:5px}
+.tag{display:inline-block;padding:3px 10px;border-radius:999px;font-size:.72rem;font-weight:700;flex:none;align-self:center}
+.tag.pendiente{background:var(--pendiente-bg);color:#8a6100}
+.tag.enviada{background:var(--enviada-bg);color:var(--enviada)}
+.tag.calificada{background:var(--calificada-bg);color:var(--calificada)}
+.tag.vencida{background:var(--vencida-bg);color:var(--vencida)}
+.nota-pill{font-size:.78rem;font-weight:700;color:var(--azul)}
+.vacio-detalle{color:var(--muted);text-align:center;padding:26px 0;font-size:.9rem}
+.atraso{color:var(--vencida)}
+.solo-fecha{font-size:.72rem;color:var(--muted);background:var(--bg);padding:1px 8px;border-radius:6px}
+
+/* ── panel lateral de lista por estado ── */
+.lista-cab{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line);font-weight:700;font-size:.9rem}
+.lista-cab .cerrar{margin-left:auto;background:var(--bg);color:var(--muted);width:28px;height:28px;border-radius:8px;font-size:.8rem}
+.lista-cab .cerrar:hover{background:#e5eaf4;color:var(--ink)}
+.sec{padding:6px 0 10px}
+.sec h3{display:flex;align-items:center;gap:8px;font-size:.72rem;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:10px 16px 6px}
+.sec h3 .cnt{margin-left:auto;background:var(--bg);color:var(--muted);border-radius:999px;padding:1px 9px;font-size:.72rem}
+.sec[data-e="pendiente"] h3 .barra-c{background:var(--pendiente)}
+.sec[data-e="enviada"] h3 .barra-c{background:var(--enviada)}
+.sec[data-e="atrasada"] h3 .barra-c{background:#b06a00}
+.sec[data-e="calificada"] h3 .barra-c{background:var(--calificada)}
+.sec[data-e="vencida"] h3 .barra-c{background:var(--vencida)}
+.barra-c{width:4px;height:14px;border-radius:3px;flex:none}
+.sec ul{list-style:none}
+.li-e{padding:9px 16px 9px 24px;cursor:pointer;border-left:3px solid transparent}
+.li-e:hover{background:#f6f8fc}
+.sec[data-e="pendiente"] .li-e:hover{border-left-color:var(--pendiente)}
+.sec[data-e="enviada"] .li-e:hover{border-left-color:var(--enviada)}
+.sec[data-e="atrasada"] .li-e:hover{border-left-color:#b06a00}
+.sec[data-e="calificada"] .li-e:hover{border-left-color:var(--calificada)}
+.sec[data-e="vencida"] .li-e:hover{border-left-color:var(--vencida)}
+.li-e .t{font-size:.8rem;font-weight:600;line-height:1.35}
+.li-e .m{font-size:.7rem;color:var(--muted);margin-top:3px;display:flex;gap:10px;flex-wrap:wrap}
+.li-e .vence{font-weight:600}
+.sec[data-e="pendiente"] .li-e .vence{color:#8a6100}
+.sec[data-e="enviada"] .li-e .vence{color:var(--enviada)}
+.sec[data-e="atrasada"] .li-e .vence{color:#b06a00}
+.sec[data-e="calificada"] .li-e .vence{color:var(--calificada)}
+.sec[data-e="vencida"] .li-e .vence{color:var(--vencida)}
+.li-e .n{color:var(--azul);font-weight:700}
+.lista-vacia{padding:18px 16px;color:var(--muted);font-size:.82rem;text-align:center}
+#btn-lista.activa{background:#fff;color:var(--azul-osc)}
+</style>
+</head>
+<body>
+<header>
+  <h1>📅 Calendario académico<span class="sub">Campus Virtual — U. Guayaquil · conectado</span></h1>
+  <div class="spacer"></div>
+  <button class="boton" id="btn-lista">📋 Lista</button>
+  <button class="boton solid" id="btn-refrescar">⟳ Actualizar</button>
+  <a class="boton" href="/logout" title="Cerrar sesión" style="text-decoration:none">🚪 Salir</a>
+</header>
+
+<div class="tabs" id="tabs"></div>
+<main>
+  <div class="panel" id="panel-cal">
+    <div class="barra">
+      <button class="nav-btn" id="prev">◀</button>
+      <span class="mes" id="mes-nombre">—</span>
+      <button class="nav-btn" id="next">▶</button>
+      <button class="nav-btn" id="hoy-btn">Hoy</button>
+      <span id="estado-carga" hidden>⏳ consultando estados en el campus…</span>
+    </div>
+    <div class="btn-row" id="btn-estados" title="Cada botón abre una ventana con esas tareas"></div>
+    <div class="btn-row" id="btn-cursos" title="Cada botón abre una ventana con las actividades del curso"></div>
+    <table class="grid" id="tabla"></table>
+  </div>
+
+  <div class="panel" id="panel-vista" hidden>
+    <div class="v-cabecera"><h2 id="vista-titulo">—</h2><span class="desc" id="vista-desc"></span></div>
+    <div class="v-cuerpo" id="vista-lista"></div>
+  </div>
+
+  <div class="panel detalle" id="panel-detalle" hidden></div>
+
+  <aside class="panel" id="panel-lista">
+    <div class="lista-cab">📋 Actividades por estado<button class="cerrar" id="cerrar-lista" title="Cerrar lista">✕</button></div>
+    <div id="lista-contenido"></div>
+  </aside>
+
+</main>
+
+<script>
+const NOMBRES_MES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const NOMBRES_DIA = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
+const GUARDADOS = "calUG.limite";
+const hoy0 = new Date(); hoy0.setHours(0,0,0,0);
+let ref = new Date(hoy0); // mes mostrado (navegable)
+let eventos = [];
+let materias = [];
+let diaSel = null;
+
+/* límite: guardamos "mes actual como visto" para arrancar siempre acá */
+let visto = { y: ref.getFullYear(), m: ref.getMonth()+1 };
+localStorage.setItem(GUARDADOS, JSON.stringify(visto));
+
+const $ = (s) => document.querySelector(s);
+
+async function cargar(forzar = false) {
+  const tabla = $("#tabla");
+  tabla.innerHTML = `<tr><td class="tmp">…</td></tr>`;
+  $("#panel-detalle").hidden = true;
+  const ep = forzar ? `/api/refrescar` : `/api/calendario`;
+  let r = null, err = null;
+  for (let intento = 0; intento < 3; intento++) {
+    try { r = await fetch(`${ep}?year=${visto.y}&month=${visto.m}`); break; }
+    catch (e) { err = e; await new Promise(x => setTimeout(x, 2500)); }
+  }
+  if (!r) { tabla.innerHTML = `<tr><td style="color:var(--vencida);text-align:center;padding:30px">No se pudo conectar. ¿Está corriendo «node server.mjs»? Reintentando al navegar de mes.</td></tr>`; return; }
+  if (r.status === 401) { location.href = "/login"; return; }
+  if (!r.ok) { tabla.innerHTML = `<tr><td style="color:var(--vencida);text-align:center;padding:30px">Error conectando al campus: ${(await r.json()).error ?? r.status}</td></tr>`; return; }
+  const data = await r.json();
+  eventos = data.eventos;
+  materias = data.materias ?? [];
+  if (!forzar) { pintarTodo(); await completarEstados(); return; }
+  pintarTodo();
+}
+
+/* 2.ª etapa: resuelve en el campus el estado de las tareas sin caché */
+async function completarEstados() {
+  const aviso = $("#estado-carga");
+  const faltan = eventos.some(e => e.component === "mod_assign" ? e.sinEstadoExacto : !e.curso);
+  if (!faltan) return;
+  aviso.hidden = false;
+  const mesPedido = { ...visto };
+  try {
+    const r = await fetch(`/api/estados?year=${mesPedido.y}&month=${mesPedido.m}`);
+    if (r.status === 401) { location.href = "/login"; return; }
+    if (r.ok) {
+      const data = await r.json();
+      const nuevos = data.eventos;
+      materias = data.materias ?? materias;
+      if (visto.y === mesPedido.y && visto.m === mesPedido.m) { eventos = nuevos; pintarTodo(); }
+    }
+  } catch {} finally { aviso.hidden = true; }
+}
+
+function pintarTodo(){ pintaBotones(); pintaCalendario(); pintaLista(); pintarVistas(); pintaDetalle(); }
+
+/* ── botones rápidos por estado / curso ── */
+const ordenFecha = (a, b) => a.fecha.localeCompare(b.fecha);
+
+let VISTAS = ["cal"];   // pestañas abiertas: "cal" | "estado:X" | "curso:NAME"
+let vistaActiva = "cal";
+
+function idVista(tipo, clave){ return tipo + ":" + clave; }
+function quickEstado(e, k){
+  if (k === "atrasada") return e.estado === "enviada" && e.tarde;
+  return e.estado === k && !(k === "enviada" && e.tarde);
+}
+
+function pintaBotones(){
+  const c = countPorEstado();
+  $("#btn-estados").innerHTML = [["pendiente","Pendientes"],["atrasada","Atrasadas"],["enviada","Enviadas"],["calificada","Calificadas"],["vencida","Vencidas"]]
+    .map(([k, t]) => `<button class="b-estado" data-e="${k}">${t} <b>${c[k]}</b></button>`).join("");
+  const nombres = materias.length
+    ? materias.map(m => m.nombre)
+    : [...new Set(eventos.map(e => e.curso).filter(Boolean))];
+  $("#btn-cursos").innerHTML = nombres.sort((a, b) => a.localeCompare(b))
+    .map(cv => `<button class="b-curso" data-curso="${esc(cv)}">${esc(cv)} <b>${eventos.filter(e => e.curso === cv).length}</b></button>`).join("");
+}
+$("#btn-estados").onclick = (ev) => { const b = ev.target.closest("button"); if (b) abrirVista("estado", b.dataset.e); };
+$("#btn-cursos").onclick  = (ev) => { const b = ev.target.closest("button"); if (b) abrirVista("curso", b.dataset.curso); };
+
+/* ── pestañas de vista ── */
+function abrirVista(tipo, clave){
+  const id = tipo ? idVista(tipo, clave) : clave;
+  if (!VISTAS.includes(id)) VISTAS.push(id);
+  vistaActiva = id;
+  pintarVistas();
+}
+
+function datosVista(id){
+  const [tipo, ...resto] = id.split(":");
+  const clave = resto.join(":");
+  const items = tipo === "estado"
+    ? eventos.filter(e => quickEstado(e, clave)).slice().sort(ordenFecha)
+    : eventos.filter(e => e.curso === clave).slice().sort(ordenFecha);
+  const titulo = tipo === "estado"
+    ? (ETIQUETAS_ESTADO.find(x => x[0] === clave)?.[1] ?? clave)
+    : clave;
+  const barra = tipo === "estado" ? "var(--" + (clave === "atrasada" ? "enviada" : clave) + ")" : "var(--azul)";
+  return { tipo, items, titulo, barra };
+}
+
+function tituloCortoVista(id){
+  const d = datosVista(id);
+  return d.tipo === "estado" ? (ETIQUETAS_ESTADO.find(x => x[0] === id.slice(7))?.[1].split(" (")[0] ?? d.titulo) : d.titulo;
+}
+
+function pintarVistas(){
+  $("#tabs").innerHTML = VISTAS.map(id => {
+    if (id === "cal") return `<button class="tab ${vistaActiva === id ? "activa" : ""}" data-id="cal">📅 Calendario</button>`;
+    const d = datosVista(id);
+    return `<button class="tab ${vistaActiva === id ? "activa" : ""}" data-id="${esc(id)}">
+      <span class="barra-tab" style="background:${d.barra}"></span>${esc(tituloCortoVista(id))} (${d.items.length})<span class="x" data-x="1" title="Cerrar pestaña">✕</span></button>`;
+  }).join("");
+  pintarVistaActiva();
+}
+
+function itemVentana(e){
+  const TXT = { pendiente:"Pendiente", enviada:e.tarde ? "Atrasada" : "Enviada", calificada:"Calificada", vencida:"Vencida" };
+  const meta = [`<span>📅 ${vencimientoHasta(e)}</span>`, `<span>${e.actividad}</span>`];
+  if (e.curso) meta.push(`<span>📚 ${esc(e.curso)}</span>`);
+  if (e.nota) meta.push(`<span class="n">⭐ ${esc(e.nota)}</span>`);
+  if (e.sinEstadoExacto) meta.push(`<span>revisar en el campus</span>`);
+  if (e.tarde) meta.push(`<span class="atraso">⚠️ fuera de plazo</span>`);
+  return `<li class="v-item" data-e="${e.estado === "enviada" && e.tarde ? "atrasada" : e.estado}" data-url="${esc(e.url)}" title="Abrir en el campus →">
+    <span class="barrita"></span>
+    <div class="info"><div class="t">${esc(e.titulo)}</div><div class="m">${meta.join("")}</div></div>
+    <span class="tag ${e.estado === "enviada" && e.tarde ? "atrasada" : e.estado}">${TXT[e.estado] ?? e.estado}</span>
+  </li>`;
+}
+
+function pintarVistaActiva(){
+  const esCal = vistaActiva === "cal";
+  $("#panel-cal").style.display = esCal ? "" : "none";
+  $("#panel-vista").hidden = esCal;
+  if (esCal) return;
+  const d = datosVista(vistaActiva);
+  $("#vista-titulo").textContent = d.titulo;
+  $("#vista-desc").textContent = `${d.items.length} ${d.items.length === 1 ? "actividad" : "actividades"} — ${NOMBRES_MES[visto.m-1]} ${visto.y} · clic en una tarea para abrirla en el campus`;
+  $("#vista-lista").innerHTML = d.items.length
+    ? `<ul style="list-style:none;margin:0">${d.items.map(itemVentana).join("")}</ul>`
+    : `<div class="lista-vacia">No hay actividades en esta vista.</div>`;
+}
+
+$("#tabs").onclick = (ev) => {
+  const b = ev.target.closest(".tab"); if (!b) return;
+  if (ev.target.closest(".x")) {
+    const id = b.dataset.id, i = VISTAS.indexOf(id);
+    if (i >= 0) VISTAS.splice(i, 1);
+    if (vistaActiva === id) vistaActiva = VISTAS[VISTAS.length - 1] || "cal";
+    pintarVistas();
+    return;
+  }
+  vistaActiva = b.dataset.id;
+  pintarVistas();
+};
+$("#panel-vista").onclick = (ev) => {
+  const li = ev.target.closest(".v-item");
+  if (li && li.dataset.url) abrirEnCampus(li.dataset.url);
+};
+
+/* ── lista lateral por estado ── */
+const GRUPOS = [
+  ["pendiente",  "🟡 Pendientes — por entregar"],
+  ["atrasada",   "🟠 Atrasadas — entregadas fuera de plazo"],
+  ["enviada",    "🟢 Enviadas"],
+  ["calificada", "🔵 Calificadas"],
+  ["vencida",    "🔴 Vencidas — sin entregar"],
+];
+
+function pintaLista(){
+  const orden = (a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0);
+  const grupos = { pendiente:[], enviada:[], atrasada:[], calificada:[], vencida:[] };
+  for (const e of eventos) {
+    if (e.estado === "enviada" && e.tarde) grupos.atrasada.push(e);
+    else if (grupos[e.estado]) grupos[e.estado].push(e);
+  }
+  let html = "";
+  for (const [k, titulo] of GRUPOS) {
+    const items = grupos[k].slice().sort(orden);
+    if (!items.length) { continue; }
+    html += `<div class="sec" data-e="${k}">
+      <h3><span class="barra-c"></span>${titulo}<span class="cnt">${items.length}</span></h3>
+      <ul>${items.map(itemHTML).join("")}</ul>
+    </div>`;
+  }
+  $("#lista-contenido").innerHTML = html || `<div class="lista-vacia">No hay actividades que mostrar.</div>`;
+}
+
+function itemHTML(e){
+  const vence = vencimientoHasta(e) + (e.year !== hoy0.getFullYear() ? " " + e.year : "");
+  const meta = [ `<span class="vence">📅 ${vence}</span>`, `<span>${e.actividad}</span>` ];
+  if (e.curso) meta.push(`<span>📚 ${esc(e.curso)}</span>`);
+  if (e.nota) meta.push(`<span class="n">⭐ ${esc(e.nota)}</span>`);
+  if (e.sinEstadoExacto) meta.push(`<span>revisar en el campus</span>`);
+  return `<li class="li-e" data-url="${esc(e.url)}" title="Abrir en el campus →">
+      <div class="t">${esc(e.titulo)}</div>
+      <div class="m">${meta.join("")}</div>
+    </li>`;
+}
+
+$("#btn-lista").onclick = () => document.body.classList.toggle("lista");
+$("#cerrar-lista").onclick = () => document.body.classList.remove("lista");
+document.body.addEventListener("click", (ev) => {
+  const li = ev.target.closest(".li-e");
+  if (li && li.dataset.url) abrirEnCampus(li.dataset.url);
+});
+
+const ETIQUETAS_ESTADO = [
+  ["todos",      "Todos los estados"],
+  ["pendiente",  "Pendientes"],
+  ["atrasada",   "Atrasadas (entregadas fuera de plazo)"],
+  ["enviada",    "Enviadas"],
+  ["calificada", "Calificadas"],
+  ["vencida",    "Vencidas (sin entregar)"],
+];
+
+function countPorEstado(){
+  const c = { todos:0, pendiente:0, enviada:0, atrasada:0, calificada:0, vencida:0 };
+  for (const e of eventos) {
+    const k = e.estado === "enviada" && e.tarde ? "atrasada" : e.estado;
+    c.todos++;
+    if (c[k] !== undefined) c[k]++;
+  }
+  return c;
+}
+
+function pintaCalendario(){
+  $("#mes-nombre").textContent = `${NOMBRES_MES[visto.m-1]} ${visto.y}`;
+  const y = visto.y, m = visto.m - 1;
+  const primerDia = new Date(y, m, 1);
+  const diasMes = new Date(y, m+1, 0).getDate();
+  let offset = (primerDia.getDay() + 6) % 7; // lunes=0
+  const hecho = [];
+  $("#tabla").innerHTML = `<tr>${["Lun","Mar","Mié","Jue","Vie","Sáb","Dom"].map(d=>`<th>${d}</th>`).join("")}</tr>`;
+  const hoyN = hoy0.getDate(), hoyM = hoy0.getMonth()+1, hoyY = hoy0.getFullYear();
+  let fila = "<tr>";
+  for (let i=0;i<42;i++){
+    const n = i - offset + 1;
+    if (n < 1 || n > diasMes) { fila += i%7===0?"</tr><tr>":""; fila += `<td class="vacio"></td>`; }
+    else {
+      const esHoy = n===hoyN && m+1===hoyM && y===hoyY;
+      const sel = diaSel && diaSel.y===y && diaSel.m===m+1 && diaSel.d===n;
+      const evs = eventos.filter(e => e.day === n);
+      const chips = evs.slice(0,4).map(e =>
+        `<span class="ev" data-e="${e.estado}" data-url="${esc(e.url)}" data-d="1" title="${esc(e.titulo)} — clic para abrir en el campus">${esc(corto(e.titulo))}</span>`
+      ).join("") + (evs.length > 4 ? `<span class="ev" data-d="1" style="background:var(--bg);color:var(--muted)">+${evs.length-4} más…</span>` : "");
+      fila += `<td class="${esHoy?"hoy":""} ${n?"hoyno":""} ${sel?"sel":""}" data-dia="${n}">
+        <span class="dia-num">${n}</span>${chips}</td>`;
+    }
+    if (i%7===6 && i!==41) fila += "</tr><tr>";
+  }
+  fila += "</tr>";
+  $("#tabla").innerHTML = $("#tabla").innerHTML + fila;
+}
+
+function corto(t){ return t.length > 26 ? t.slice(0,25)+"…" : t; }
+function esc(s){ return s.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;"); }
+
+function pintaDetalle(){
+  const p = $("#panel-detalle");
+  if (p.hidden) return;
+  if (!diaSel) return;
+  const fecha = new Date(diaSel.y, diaSel.m - 1, diaSel.d);
+  const evs = eventos.filter(e => e.day === diaSel.d)
+    .sort((a,b) => (a.actividad || "").localeCompare(b.actividad || ""));
+  p.innerHTML = `<h2>${NOMBRES_DIA[fecha.getDay()]}, ${diaSel.d} de ${NOMBRES_MES[diaSel.m-1]}</h2>
+    <div class="fecha-larga">${evs.length ? evs.length+" "+(evs.length===1?"actividad":"actividades")+" con fecha límite o aviso en este día" : "Sin actividades este día."}</div>` +
+    (evs.length ? evs.map(tareaHTML).join("") : "");
+}
+
+function tareaHTML(e){
+  const vencTex = vencimientoHasta(e);
+  const meta = [`<span>${e.actividad}</span>`, `<span>📅 ${vencTex}</span>`];
+  if (e.curso) meta.push(`<span>📚 ${esc(e.curso)}</span>`);
+  if (e.nota) meta.push(`<span class="nota-pill">⭐ Nota: ${esc(e.nota)}</span>`);
+  if (e.sinEstadoExacto) meta.push(`<span class="solo-fecha">estado exacto: revisar en el campus</span>`);
+  if (e.tarde) meta.push(`<span class="atraso">⚠️ ${esc(e.freno ?? "entregada fuera de plazo")}</span>`);
+  const TXT = { pendiente:"Pendiente", enviada: e.tarde ? "Enviada (atrasada)" : "Enviada", calificada:"Calificada", vencida:"Vencida" };
+  return `<div class="tarea" data-e="${e.estado}">
+    <div class="indicador"></div>
+    <div class="info">
+      <div class="nombre" data-url="${esc(e.url)}" title="Abrir en el campus →">${esc(e.titulo)}</div>
+      <div class="meta">${meta.join("")}</div>
+    </div>
+    <div class="tag ${e.estado}">${TXT[e.estado] ?? e.estado}</div>
+  </div>`;
+}
+
+function vencimientoHasta(e){
+  const d = new Date(e.year, e.month-1, e.day);
+  return `${NOMBRES_DIA[d.getDay()]} ${e.day} ${NOMBRES_MES[e.month-1]}`;
+}
+
+/* interacciones */
+/* Abre la actividad en una ventana nueva del navegador; si el navegador la
+   bloquea, usa una pestaña nueva como respaldo. */
+function abrirEnCampus(url){
+  const ancho = Math.min(1200, screen.availWidth - 80);
+  const alto  = Math.min(900,  screen.availHeight - 80);
+  let w = null;
+  try { w = window.open(url, "CampusUG", `width=${ancho},height=${alto}`); } catch {}
+  if (!w) { // bloqueada por el navegador → pestaña como respaldo (una sola vez)
+    try { window.open(url, "_blank", "noopener"); } catch {}
+  }
+}
+$("#tabla").onclick = (ev) => {
+  const td = ev.target.closest("td");
+  if (!td || !td.dataset.dia) return;
+  const cand = ev.target.closest(".ev[data-url], .nombre[data-url]");
+  if (cand) { abrirEnCampus(cand.dataset.url); return; }
+  diaSel = { y: visto.y, m: visto.m, d: +td.dataset.dia };
+  const detalle = $("#panel-detalle"); detalle.hidden = false;
+  pintarTodo();
+};
+$("#panel-detalle").onclick = (ev) => {
+  const cand = ev.target.closest(".nombre[data-url]");
+  if (cand) abrirEnCampus(cand.dataset.url);
+};
+$("#prev").onclick = () => cambiarMes(-1);
+$("#next").onclick = () => cambiarMes(1);
+$("#hoy-btn").onclick = () => { visto = { y: hoy0.getFullYear(), m: hoy0.getMonth()+1 }; diaSel = null; cargar(); };
+function cambiarMes(delta){ diaSel = null; visto.m += delta; if (visto.m < 1){ visto.m = 12; visto.y--; } if (visto.m > 12){ visto.m = 1; visto.y++; } cargar(); }
+$("#btn-refrescar").onclick = async (ev) => {
+  const b = ev.currentTarget; b.disabled = true; b.textContent = "↻ Consultando…";
+  await cargar(true);
+  b.disabled = false; b.textContent = "⟳ Actualizar";
+};
+cargar();
+</script>
+</body>
+</html>
