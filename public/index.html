@@ -103,6 +103,7 @@ td.hoyno{cursor:pointer}
 .ev[data-e="calificada"]{background:var(--calificada-bg);color:var(--calificada);border-color:#c3d5f5}
 .ev[data-e="vencida"]{background:var(--vencida-bg);color:var(--vencida);border-color:var(--vencida-brd)}
 .ev.foro{background:#e8f0fe;color:#1a5fb4;border-color:#b6ccf0}
+.ev.revisar{background:#f0f0f0;color:#555;border-color:#d0d0d0}
 .tmp{font-size:2.5rem;color:#9aa6bd;text-align:center;padding:60px 0;font-family:monospace}
 
 /* panel de detalle del día */
@@ -428,7 +429,7 @@ function pintaCalendario(){
       const sel = diaSel && diaSel.y===y && diaSel.m===m+1 && diaSel.d===n;
       const evs = eventos.filter(e => e.day === n);
       const chips = evs.slice(0,4).map(e =>
-        `<span class="ev${e.component === "mod_forum" ? " foro" : ""}" data-e="${e.estado}" data-url="${esc(e.url)}" data-d="1" title="${esc(e.titulo)} — clic para abrir en el campus">${esc(corto(e.titulo))}</span>`
+        `<span class="ev${e.component === "mod_forum" ? " foro" : e.sinEstadoExacto ? " revisar" : ""}" data-e="${e.estado}" data-url="${esc(e.url)}" data-d="1" title="${esc(e.titulo)} — clic para abrir en el campus">${esc(corto(e.titulo))}</span>`
       ).join("") + (evs.length > 4 ? `<span class="ev" data-d="1" style="background:var(--bg);color:var(--muted)">+${evs.length-4} más…</span>` : "");
       fila += `<td class="${esHoy?"hoy":""} ${n?"hoyno":""} ${sel?"sel":""}" data-dia="${n}">
         <span class="dia-num">${n}</span>${chips}</td>`;
