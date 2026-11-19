@@ -68,6 +68,7 @@ main>.panel.detalle{order:4;flex-basis:100%}
 .v-item:hover{background:#f6f8fc}
 .v-item .barrita{width:4.5px;align-self:stretch;border-radius:3px;flex:none}
 .v-item[data-e="pendiente"] .barrita{background:var(--pendiente)}
+.v-item.foro .barrita{background:#1a5fb4}
 .v-item[data-e="atrasada"] .barrita{background:#b06a00}
 .v-item[data-e="enviada"] .barrita{background:var(--enviada)}
 .v-item[data-e="calificada"] .barrita{background:var(--calificada)}
@@ -341,7 +342,7 @@ function itemVentana(e){
     meta.push(`<span>revisar en el campus</span>`);
   }
   if (e.tarde) meta.push(`<span class="atraso">⚠️ fuera de plazo</span>`);
-  return `<li class="v-item" data-e="${e.estado === "enviada" && e.tarde ? "atrasada" : e.estado}" data-url="${esc(e.url)}" title="Abrir en el campus →">
+  return `<li class="v-item${e.component === "mod_forum" ? " foro" : ""}" data-e="${e.estado === "enviada" && e.tarde ? "atrasada" : e.estado}" data-url="${esc(e.url)}" title="Abrir en el campus →">
     <span class="barrita"></span>
     <div class="info"><div class="t">${esc(e.titulo)}</div><div class="m">${meta.join("")}</div></div>
     <span class="tag ${tagEstado}">${TXT[tagEstado] ?? tagEstado}</span>
@@ -461,7 +462,6 @@ function tareaHTML(e){
   const meta = [`<span>${e.actividad}</span>`, `<span>📅 ${vencTex}</span>`];
   if (e.curso) meta.push(`<span>📚 ${esc(e.curso)}</span>`);
   if (e.nota) meta.push(`<span class="nota-pill">⭐ Nota: ${esc(e.nota)}</span>`);
-  if (e.sinEstadoExacto) meta.push(`<span class="solo-fecha">estado exacto: revisar en el campus</span>`);
   if (e.tarde) meta.push(`<span class="atraso">⚠️ ${esc(e.freno ?? "entregada fuera de plazo")}</span>`);
   const TXT = { pendiente:"Pendiente", enviada: e.tarde ? "Enviada (atrasada)" : "Enviada", calificada:"Calificada", vencida:"No enviada" };
   const esForo = e.component === "mod_forum";
