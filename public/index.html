@@ -267,7 +267,7 @@ function quickEstado(e, k){
 
 function pintaBotones(){
   const c = countPorEstado();
-  $("#btn-estados").innerHTML = [["pendiente","Pendientes"],["atrasada","Atrasadas"],["enviada","Enviadas"],["calificada","Calificadas"],["vencida","Vencidas"]]
+  $("#btn-estados").innerHTML = [["pendiente","Pendientes"],["atrasada","Atrasadas"],["enviada","Enviadas"],["calificada","Calificadas"],["vencida","No enviadas"]]
     .map(([k, t]) => `<button class="b-estado" data-e="${k}">${t} <b>${c[k]}</b></button>`).join("");
   const nombres = materias.length
     ? materias.map(m => m.nombre)
@@ -326,7 +326,7 @@ function pintarVistas(){
 }
 
 function itemVentana(e){
-  const TXT = { pendiente:"Pendiente", enviada:e.tarde ? "Atrasada" : "Enviada", calificada:"Calificada", vencida:"Vencida", revisar:"Revisar", respondido:"Respondido" };
+  const TXT = { pendiente:"Pendiente", enviada:e.tarde ? "Atrasada" : "Enviada", calificada:"Calificada", vencida:"No enviada", revisar:"Revisar", respondido:"Respondido" };
   let tagEstado;
   if (e.component === "mod_forum") tagEstado = e.respondido ? "respondido" : "revisar";
   else if (e.sinEstadoExacto) tagEstado = "revisar";
@@ -383,7 +383,7 @@ const GRUPOS = [
   ["atrasada",   "🟠 Atrasadas — entregadas fuera de plazo"],
   ["enviada",    "🟢 Enviadas"],
   ["calificada", "🔵 Calificadas"],
-  ["vencida",    "🔴 Vencidas — sin entregar"],
+  ["vencida",    "🔴 No enviadas — sin entregar"],
 ];
 
 document.body.addEventListener("click", (ev) => {
@@ -397,7 +397,7 @@ const ETIQUETAS_ESTADO = [
   ["atrasada",   "Atrasadas (entregadas fuera de plazo)"],
   ["enviada",    "Enviadas"],
   ["calificada", "Calificadas"],
-  ["vencida",    "Vencidas (sin entregar)"],
+  ["vencida",    "No enviadas (sin entregar)"],
 ];
 
 function countPorEstado(){
@@ -462,7 +462,7 @@ function tareaHTML(e){
   if (e.nota) meta.push(`<span class="nota-pill">⭐ Nota: ${esc(e.nota)}</span>`);
   if (e.sinEstadoExacto) meta.push(`<span class="solo-fecha">estado exacto: revisar en el campus</span>`);
   if (e.tarde) meta.push(`<span class="atraso">⚠️ ${esc(e.freno ?? "entregada fuera de plazo")}</span>`);
-  const TXT = { pendiente:"Pendiente", enviada: e.tarde ? "Enviada (atrasada)" : "Enviada", calificada:"Calificada", vencida:"Vencida" };
+  const TXT = { pendiente:"Pendiente", enviada: e.tarde ? "Enviada (atrasada)" : "Enviada", calificada:"Calificada", vencida:"No enviada" };
   return `<div class="tarea" data-e="${e.estado}">
     <div class="indicador"></div>
     <div class="info">
