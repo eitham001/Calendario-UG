@@ -117,6 +117,7 @@ td.hoyno{cursor:pointer}
 .tarea[data-e="enviada"] .indicador{background:var(--enviada)}
 .tarea[data-e="calificada"] .indicador{background:var(--calificada)}
 .tarea[data-e="vencida"] .indicador{background:var(--vencida)}
+.tarea.foro .indicador{background:#1a5fb4}
 .tarea .info{flex:1;min-width:0}
 .tarea .nombre{font-weight:600;font-size:.92rem;line-height:1.35;cursor:pointer}
 .tarea .nombre:hover{color:var(--azul);text-decoration:underline}
@@ -463,13 +464,14 @@ function tareaHTML(e){
   if (e.sinEstadoExacto) meta.push(`<span class="solo-fecha">estado exacto: revisar en el campus</span>`);
   if (e.tarde) meta.push(`<span class="atraso">⚠️ ${esc(e.freno ?? "entregada fuera de plazo")}</span>`);
   const TXT = { pendiente:"Pendiente", enviada: e.tarde ? "Enviada (atrasada)" : "Enviada", calificada:"Calificada", vencida:"No enviada" };
-  return `<div class="tarea" data-e="${e.estado}">
+  const esForo = e.component === "mod_forum";
+  return `<div class="tarea${esForo ? " foro" : ""}" data-e="${e.estado}">
     <div class="indicador"></div>
     <div class="info">
       <div class="nombre" data-url="${esc(e.url)}" title="Abrir en el campus →">${esc(e.titulo)}</div>
       <div class="meta">${meta.join("")}</div>
     </div>
-    <div class="tag ${e.estado}">${TXT[e.estado] ?? e.estado}</div>
+    ${esForo ? "" : `<div class="tag ${e.estado}">${TXT[e.estado] ?? e.estado}</div>`}
   </div>`;
 }
 
