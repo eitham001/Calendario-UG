@@ -13,16 +13,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const fileCfg = fs.existsSync(path.join(__dirname, "config.json"))
   ? JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"))
   : {};
-const cfg = {
-  baseUrl: process.env.CAMPUS_URL ?? fileCfg.baseUrl,
-  username: process.env.CAMPUS_USER ?? fileCfg.username,
-  password: process.env.CAMPUS_PASS ?? fileCfg.password,
-};
-const BASE = cfg.baseUrl.replace(/\/$/, "");
+const BASE = (process.env.CAMPUS_URL ?? fileCfg.baseUrl ?? "https://campusvirtual2.ug.edu.ec").replace(/\/$/, "");
 const PORT = process.env.PORT || 3210;
-// Credenciales de acceso al tablero (por defecto = las del campus)
-const APP_USER = process.env.APP_USER ?? cfg.username;
-const APP_PASS = process.env.APP_PASS ?? cfg.password;
 const sesiones = new Set();
 function nuevoSid() { return crypto.randomBytes(16).toString("hex"); }
 function parseCookies(req) {
@@ -40,12 +32,13 @@ async function leerBody(req) {
   return Buffer.concat(chunks).toString("utf8");
 }
 const CACHE_FILE = path.join(__dirname, "cache-estado.json");
-const TTL_ESTADO = 6 * 3600 * 1000;   // 6 h de vigencia del estado por tarea
+const TTL_ESTADO = 1 * 3600 * 1000;   // 1 h de vigencia del estado por tarea (más corto para no mostrar datos viejos)
 const TTL_CALENDARIO = 30 * 60 * 1000; // 30 min del calendario por mes
 
 // ── Sesión en el campus ──────────────────────────────────────────────────────
 let jar = new Map();
 let loggedAt = 0;
+let campusCreds = null;
 
 const cookieHeader = () => [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
 function saveCookies(res) {
@@ -74,12 +67,13 @@ async function fetchCampus(url, { method = "GET", body } = {}) {
   return res;
 }
 
-async function login() {
+async function login(creds) {
+  campusCreds = creds;
   jar = new Map();
   const lp = await fetchCampus(`${BASE}/login/index.php`);
   const lpHtml = await lp.text();
   const logintoken = (lpHtml.match(/name="logintoken"\s*value="([^"]+)"/) ?? [])[1] ?? "";
-  const body = new URLSearchParams({ username: cfg.username, password: cfg.password, logintoken }).toString();
+  const body = new URLSearchParams({ username: creds.user, password: creds.pass, logintoken }).toString();
   const resp = await fetchCampus(`${BASE}/login/index.php`, { method: "POST", body });
   const redir = resp.headers.get("location");
   if (!redir || redir.includes("login")) {
@@ -88,11 +82,14 @@ async function login() {
   }
   if (redir) await fetchCampus(redir);
   loggedAt = Date.now();
-  console.log(`[sesión] conectado como ${cfg.username}`);
+  console.log(`[sesión] conectado como ${creds.user}`);
 }
 
 function sesionValida() { return jar.size > 0 && Date.now() - loggedAt < 50 * 60 * 1000; }
-async function asegurarSesion() { if (!sesionValida()) await login(); }
+async function asegurarSesion() {
+  if (!campusCreds) throw new Error("No hay sesión de campus");
+  if (!sesionValida()) await login(campusCreds);
+}
 
 // ── Parser del calendario mensual ────────────────────────────────────────────
 const LIMPIEZA_NOMBRE = [
@@ -146,6 +143,12 @@ function parsearCalendario(html, year, month) {
 }
 
 // ── Parser del estado de entregas (página de cada actividad) ─────────────────
+function parsearEstadoForum(html) {
+  return {
+    curso: parsearCursoDe(html),
+    respondido: /Darse de baja|Unsubscribe/i.test(html),
+  };
+}
 function parsearCursoDe(html) {
   const curso = html.match(/<a[^>]*href="[^"]*course\/view\.php\?id=\d+"[^>]*>\s*([^<]+?)\s*<\/a>/);
   if (curso) return decodeEntities(curso[1]);
@@ -209,6 +212,8 @@ async function consultarEstado(e, forzar = false) {
   let det;
   if (e.component === "mod_assign") {
     det = parsearEstadoAsign(html);
+  } else if (e.component === "mod_forum") {
+    det = parsearEstadoForum(html);
   } else {
     // Taller / quiz / otro: solo el curso (el estado exacto no es fiable aquí)
     det = { curso: parsearCursoDe(html) };
@@ -261,6 +266,9 @@ async function aplicarEstados(eventos, { resolver = false, forzarEstado = false 
       if (det.curso) e.curso = det.curso;
       e.nota = det.nota; e.tarde = det.tarde;
       e.enviado = det.enviado; e.califOk = det.calificada;
+      e.respondido = !!det.respondido;
+    } else {
+      e.respondido = false;
     }
     const st = estadoDe(e, det);
     e.estado = st.estado;
@@ -298,7 +306,7 @@ button:hover{filter:brightness(1.05)}
 <body>
 <form class="card" method="post" action="/login">
   <h1>📅 Calendario UG</h1>
-  <p>Inicia sesión para ver tu calendario académico.</p>
+  <p>Inicia sesión con tu usuario y contraseña del campus virtual.</p>
   <label for="u">Usuario</label>
   <input id="u" name="user" autocomplete="username" required>
   <label for="p">Contraseña</label>
@@ -326,14 +334,18 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "POST") {
         const body = await leerBody(req);
         const params = new URLSearchParams(body);
-        if (params.get("user") === APP_USER && params.get("pass") === APP_PASS) {
+        const user = params.get("user") ?? "";
+        const pass = params.get("pass") ?? "";
+        try {
+          await login({ user, pass });
           const sid = nuevoSid();
           sesiones.add(sid);
           res.writeHead(302, {
             "Set-Cookie": `sid=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`,
             "Location": "/",
           });
-        } else {
+        } catch (e) {
+          campusCreds = null;
           res.writeHead(302, { "Location": "/login?error=1" });
         }
         res.end();
@@ -343,6 +355,7 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/logout") {
       const sid = parseCookies(req).sid;
       if (sid) sesiones.delete(sid);
+      campusCreds = null;
       res.writeHead(302, {
         "Set-Cookie": "sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
         "Location": "/login",

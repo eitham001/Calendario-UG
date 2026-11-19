@@ -42,7 +42,7 @@ main>.panel.detalle{order:4;flex-basis:100%}
 
 /* ── botones por estado y por curso ── */
 .btn-row{display:flex;gap:6px;flex-wrap:wrap;padding:0 18px 8px}
-.b-estado,.b-curso{font:inherit;font-size:.78rem;font-weight:600;padding:5px 13px;border-radius:999px;cursor:pointer;background:var(--bg);border:1px solid var(--line);color:var(--ink)}
+.b-estado,.b-curso,.b-otros{font:inherit;font-size:.78rem;font-weight:600;padding:5px 13px;border-radius:999px;cursor:pointer;background:var(--bg);border:1px solid var(--line);color:var(--ink)}
 .b-estado:hover,.b-curso:hover{filter:brightness(.94)}
 .b-estado[data-e="pendiente"]{background:var(--pendiente-bg);border-color:#eed98f;color:#8a6100}
 .b-estado[data-e="atrasada"]{background:#f6ebd8;border-color:#d9bd82;color:#8a5a00}
@@ -105,6 +105,7 @@ td.hoyno{cursor:pointer}
 .ev[data-e="enviada"]{background:var(--enviada-bg);color:var(--enviada);border-color:#bfe4cf}
 .ev[data-e="calificada"]{background:var(--calificada-bg);color:var(--calificada);border-color:#c3d5f5}
 .ev[data-e="vencida"]{background:var(--vencida-bg);color:var(--vencida);border-color:var(--vencida-brd)}
+.ev.foro{background:#e8f0fe;color:#1a5fb4;border-color:#b6ccf0}
 .tmp{font-size:2.5rem;color:#9aa6bd;text-align:center;padding:60px 0;font-family:monospace}
 
 /* panel de detalle del día */
@@ -127,6 +128,8 @@ td.hoyno{cursor:pointer}
 .tag.enviada{background:var(--enviada-bg);color:var(--enviada)}
 .tag.calificada{background:var(--calificada-bg);color:var(--calificada)}
 .tag.vencida{background:var(--vencida-bg);color:var(--vencida)}
+.tag.revisar{background:#f0f0f0;color:#555;border:1px dashed #bbb}
+.tag.respondido{background:#e6f4ea;color:#1e7e34;border:1px solid #b7dfc0}
 .nota-pill{font-size:.78rem;font-weight:700;color:var(--azul)}
 .vacio-detalle{color:var(--muted);text-align:center;padding:26px 0;font-size:.9rem}
 .atraso{color:var(--vencida)}
@@ -187,6 +190,7 @@ td.hoyno{cursor:pointer}
     </div>
     <div class="btn-row" id="btn-estados" title="Cada botón abre una ventana con esas tareas"></div>
     <div class="btn-row" id="btn-cursos" title="Cada botón abre una ventana con las actividades del curso"></div>
+    <div class="btn-row" id="btn-otros" title="Actividades que el campus no expone con estado fiable"></div>
     <table class="grid" id="tabla"></table>
   </div>
 
@@ -282,9 +286,15 @@ function pintaBotones(){
     : [...new Set(eventos.map(e => e.curso).filter(Boolean))];
   $("#btn-cursos").innerHTML = nombres.sort((a, b) => a.localeCompare(b))
     .map(cv => `<button class="b-curso" data-curso="${esc(cv)}">${esc(cv)} <b>${eventos.filter(e => e.curso === cv).length}</b></button>`).join("");
+  const nForos = eventos.filter(e => e.component === "mod_forum").length;
+  const nTalleres = eventos.filter(e => e.component === "mod_workshop").length;
+  $("#btn-otros").innerHTML =
+    `<button class="b-otros" data-tipo="foros">💬 Foros <b>${nForos}</b></button>` +
+    `<button class="b-otros" data-tipo="talleres">🧪 Talleres <b>${nTalleres}</b></button>`;
 }
 $("#btn-estados").onclick = (ev) => { const b = ev.target.closest("button"); if (b) abrirVista("estado", b.dataset.e); };
 $("#btn-cursos").onclick  = (ev) => { const b = ev.target.closest("button"); if (b) abrirVista("curso", b.dataset.curso); };
+$("#btn-otros").onclick   = (ev) => { const b = ev.target.closest("button"); if (b) abrirVista(b.dataset.tipo, b.dataset.tipo === "foros" ? "Foros" : "Talleres"); };
 
 /* ── pestañas de vista ── */
 function abrirVista(tipo, clave){
@@ -297,11 +307,15 @@ function abrirVista(tipo, clave){
 function datosVista(id){
   const [tipo, ...resto] = id.split(":");
   const clave = resto.join(":");
-  const items = tipo === "estado"
-    ? eventos.filter(e => quickEstado(e, clave)).slice().sort(ordenFecha)
-    : eventos.filter(e => e.curso === clave).slice().sort(ordenFecha);
+  let items;
+  if (tipo === "estado") items = eventos.filter(e => quickEstado(e, clave)).slice().sort(ordenFecha);
+  else if (tipo === "foros") items = eventos.filter(e => e.component === "mod_forum").slice().sort(ordenFecha);
+  else if (tipo === "talleres") items = eventos.filter(e => e.component === "mod_workshop").slice().sort(ordenFecha);
+  else items = eventos.filter(e => e.curso === clave).slice().sort(ordenFecha);
   const titulo = tipo === "estado"
     ? (ETIQUETAS_ESTADO.find(x => x[0] === clave)?.[1] ?? clave)
+    : tipo === "foros" ? "Foros"
+    : tipo === "talleres" ? "Talleres"
     : clave;
   const barra = tipo === "estado" ? "var(--" + (clave === "atrasada" ? "enviada" : clave) + ")" : "var(--azul)";
   return { tipo, items, titulo, barra };
@@ -309,7 +323,8 @@ function datosVista(id){
 
 function tituloCortoVista(id){
   const d = datosVista(id);
-  return d.tipo === "estado" ? (ETIQUETAS_ESTADO.find(x => x[0] === id.slice(7))?.[1].split(" (")[0] ?? d.titulo) : d.titulo;
+  if (d.tipo === "estado") return (ETIQUETAS_ESTADO.find(x => x[0] === id.slice(7))?.[1].split(" (")[0] ?? d.titulo);
+  return d.titulo;
 }
 
 function pintarVistas(){
@@ -323,16 +338,24 @@ function pintarVistas(){
 }
 
 function itemVentana(e){
-  const TXT = { pendiente:"Pendiente", enviada:e.tarde ? "Atrasada" : "Enviada", calificada:"Calificada", vencida:"Vencida" };
+  const TXT = { pendiente:"Pendiente", enviada:e.tarde ? "Atrasada" : "Enviada", calificada:"Calificada", vencida:"Vencida", revisar:"Revisar", respondido:"Respondido" };
+  let tagEstado;
+  if (e.component === "mod_forum") tagEstado = e.respondido ? "respondido" : "revisar";
+  else if (e.sinEstadoExacto) tagEstado = "revisar";
+  else tagEstado = e.estado === "enviada" && e.tarde ? "atrasada" : e.estado;
   const meta = [`<span>📅 ${vencimientoHasta(e)}</span>`, `<span>${e.actividad}</span>`];
   if (e.curso) meta.push(`<span>📚 ${esc(e.curso)}</span>`);
   if (e.nota) meta.push(`<span class="n">⭐ ${esc(e.nota)}</span>`);
-  if (e.sinEstadoExacto) meta.push(`<span>revisar en el campus</span>`);
+  if (e.component === "mod_forum") {
+    meta.push(e.respondido ? `<span>respondido</span>` : `<span>revisar en el campus</span>`);
+  } else if (e.sinEstadoExacto) {
+    meta.push(`<span>revisar en el campus</span>`);
+  }
   if (e.tarde) meta.push(`<span class="atraso">⚠️ fuera de plazo</span>`);
   return `<li class="v-item" data-e="${e.estado === "enviada" && e.tarde ? "atrasada" : e.estado}" data-url="${esc(e.url)}" title="Abrir en el campus →">
     <span class="barrita"></span>
     <div class="info"><div class="t">${esc(e.titulo)}</div><div class="m">${meta.join("")}</div></div>
-    <span class="tag ${e.estado === "enviada" && e.tarde ? "atrasada" : e.estado}">${TXT[e.estado] ?? e.estado}</span>
+    <span class="tag ${tagEstado}">${TXT[tagEstado] ?? tagEstado}</span>
   </li>`;
 }
 
@@ -425,6 +448,7 @@ const ETIQUETAS_ESTADO = [
 function countPorEstado(){
   const c = { todos:0, pendiente:0, enviada:0, atrasada:0, calificada:0, vencida:0 };
   for (const e of eventos) {
+    if (e.component !== "mod_assign") continue;   // foros/talleres/cuestionarios: estado "revisar en campus", no cuentan aquí
     const k = e.estado === "enviada" && e.tarde ? "atrasada" : e.estado;
     c.todos++;
     if (c[k] !== undefined) c[k]++;
@@ -450,7 +474,7 @@ function pintaCalendario(){
       const sel = diaSel && diaSel.y===y && diaSel.m===m+1 && diaSel.d===n;
       const evs = eventos.filter(e => e.day === n);
       const chips = evs.slice(0,4).map(e =>
-        `<span class="ev" data-e="${e.estado}" data-url="${esc(e.url)}" data-d="1" title="${esc(e.titulo)} — clic para abrir en el campus">${esc(corto(e.titulo))}</span>`
+        `<span class="ev${e.component === "mod_forum" ? " foro" : ""}" data-e="${e.estado}" data-url="${esc(e.url)}" data-d="1" title="${esc(e.titulo)} — clic para abrir en el campus">${esc(corto(e.titulo))}</span>`
       ).join("") + (evs.length > 4 ? `<span class="ev" data-d="1" style="background:var(--bg);color:var(--muted)">+${evs.length-4} más…</span>` : "");
       fila += `<td class="${esHoy?"hoy":""} ${n?"hoyno":""} ${sel?"sel":""}" data-dia="${n}">
         <span class="dia-num">${n}</span>${chips}</td>`;
