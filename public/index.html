@@ -27,10 +27,7 @@ button{font:inherit;cursor:pointer;border:0;border-radius:10px}
 main{max-width:1180px;margin:0 auto;padding:22px 20px 50px;display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;box-shadow:0 1px 3px rgba(20,30,60,.05)}
 #panel-cal{flex:1;min-width:540px;order:1;overflow:hidden}
-#panel-lista{width:min(375px,34vw);flex:none;order:3;display:none;position:sticky;top:14px;overflow:auto;max-height:min(78vh,900px)}
-body.lista #panel-lista{display:block}
 main>.panel.detalle{order:4;flex-basis:100%}
-@media (max-width:1100px){ #panel-cal{min-width:420px} #panel-lista{width:300px} }
 
 /* barra de mes + filtros */
 .barra{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:14px 18px}
@@ -136,9 +133,6 @@ td.hoyno{cursor:pointer}
 .solo-fecha{font-size:.72rem;color:var(--muted);background:var(--bg);padding:1px 8px;border-radius:6px}
 
 /* ── panel lateral de lista por estado ── */
-.lista-cab{display:flex;align-items:center;gap:8px;padding:13px 16px;border-bottom:1px solid var(--line);font-weight:700;font-size:.9rem}
-.lista-cab .cerrar{margin-left:auto;background:var(--bg);color:var(--muted);width:28px;height:28px;border-radius:8px;font-size:.8rem}
-.lista-cab .cerrar:hover{background:#e5eaf4;color:var(--ink)}
 .sec{padding:6px 0 10px}
 .sec h3{display:flex;align-items:center;gap:8px;font-size:.72rem;text-transform:uppercase;letter-spacing:.7px;color:var(--muted);padding:10px 16px 6px}
 .sec h3 .cnt{margin-left:auto;background:var(--bg);color:var(--muted);border-radius:999px;padding:1px 9px;font-size:.72rem}
@@ -166,14 +160,12 @@ td.hoyno{cursor:pointer}
 .sec[data-e="vencida"] .li-e .vence{color:var(--vencida)}
 .li-e .n{color:var(--azul);font-weight:700}
 .lista-vacia{padding:18px 16px;color:var(--muted);font-size:.82rem;text-align:center}
-#btn-lista.activa{background:#fff;color:var(--azul-osc)}
 </style>
 </head>
 <body>
 <header>
   <h1>📅 Calendario académico<span class="sub">Campus Virtual — U. Guayaquil · conectado</span></h1>
   <div class="spacer"></div>
-  <button class="boton" id="btn-lista">📋 Lista</button>
   <button class="boton solid" id="btn-refrescar">⟳ Actualizar</button>
   <a class="boton" href="/logout" title="Cerrar sesión" style="text-decoration:none">🚪 Salir</a>
 </header>
@@ -200,11 +192,6 @@ td.hoyno{cursor:pointer}
   </div>
 
   <div class="panel detalle" id="panel-detalle" hidden></div>
-
-  <aside class="panel" id="panel-lista">
-    <div class="lista-cab">📋 Actividades por estado<button class="cerrar" id="cerrar-lista" title="Cerrar lista">✕</button></div>
-    <div id="lista-contenido"></div>
-  </aside>
 
 </main>
 
@@ -263,7 +250,7 @@ async function completarEstados() {
   } catch {} finally { aviso.hidden = true; }
 }
 
-function pintarTodo(){ pintaBotones(); pintaCalendario(); pintaLista(); pintarVistas(); pintaDetalle(); }
+function pintarTodo(){ pintaBotones(); pintaCalendario(); pintarVistas(); pintaDetalle(); }
 
 /* ── botones rápidos por estado / curso ── */
 const ordenFecha = (a, b) => a.fecha.localeCompare(b.fecha);
@@ -398,39 +385,6 @@ const GRUPOS = [
   ["vencida",    "🔴 Vencidas — sin entregar"],
 ];
 
-function pintaLista(){
-  const orden = (a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0);
-  const grupos = { pendiente:[], enviada:[], atrasada:[], calificada:[], vencida:[] };
-  for (const e of eventos) {
-    if (e.estado === "enviada" && e.tarde) grupos.atrasada.push(e);
-    else if (grupos[e.estado]) grupos[e.estado].push(e);
-  }
-  let html = "";
-  for (const [k, titulo] of GRUPOS) {
-    const items = grupos[k].slice().sort(orden);
-    if (!items.length) { continue; }
-    html += `<div class="sec" data-e="${k}">
-      <h3><span class="barra-c"></span>${titulo}<span class="cnt">${items.length}</span></h3>
-      <ul>${items.map(itemHTML).join("")}</ul>
-    </div>`;
-  }
-  $("#lista-contenido").innerHTML = html || `<div class="lista-vacia">No hay actividades que mostrar.</div>`;
-}
-
-function itemHTML(e){
-  const vence = vencimientoHasta(e) + (e.year !== hoy0.getFullYear() ? " " + e.year : "");
-  const meta = [ `<span class="vence">📅 ${vence}</span>`, `<span>${e.actividad}</span>` ];
-  if (e.curso) meta.push(`<span>📚 ${esc(e.curso)}</span>`);
-  if (e.nota) meta.push(`<span class="n">⭐ ${esc(e.nota)}</span>`);
-  if (e.sinEstadoExacto) meta.push(`<span>revisar en el campus</span>`);
-  return `<li class="li-e" data-url="${esc(e.url)}" title="Abrir en el campus →">
-      <div class="t">${esc(e.titulo)}</div>
-      <div class="m">${meta.join("")}</div>
-    </li>`;
-}
-
-$("#btn-lista").onclick = () => document.body.classList.toggle("lista");
-$("#cerrar-lista").onclick = () => document.body.classList.remove("lista");
 document.body.addEventListener("click", (ev) => {
   const li = ev.target.closest(".li-e");
   if (li && li.dataset.url) abrirEnCampus(li.dataset.url);
@@ -527,13 +481,7 @@ function vencimientoHasta(e){
 /* Abre la actividad en una ventana nueva del navegador; si el navegador la
    bloquea, usa una pestaña nueva como respaldo. */
 function abrirEnCampus(url){
-  const ancho = Math.min(1200, screen.availWidth - 80);
-  const alto  = Math.min(900,  screen.availHeight - 80);
-  let w = null;
-  try { w = window.open(url, "CampusUG", `width=${ancho},height=${alto}`); } catch {}
-  if (!w) { // bloqueada por el navegador → pestaña como respaldo (una sola vez)
-    try { window.open(url, "_blank", "noopener"); } catch {}
-  }
+  try { window.open(url, "_blank", "noopener"); } catch { location.href = url; }
 }
 $("#tabla").onclick = (ev) => {
   const td = ev.target.closest("td");

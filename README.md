@@ -39,9 +39,8 @@ piden al iniciar sesión y no se guardan en ningún archivo.
   estado y nota). Puedes tener varias abiertas, cambiar entre ellas y
   cerrarlas con ✕.
 - **Clic en cualquier tarea** (en el calendario, en una pestaña de vista, en
-  el detalle del día o en la lista lateral) la abre en una **ventana nueva
-  del navegador**, directamente en el campus. Si tu navegador bloquea
-  ventanas emergentes, se abre como pestaña.
+  el detalle del día) la abre en una **pestaña nueva del navegador**,
+  directamente en el campus.
 - Botón ⟳ **Actualizar**: re-consulta el campus (úsalo tras entregar o calificar algo).
 - Carga en dos etapas: el calendario aparece al instante (5 s aprox.) y los
   estados de cada tarea se consultan en el campus en segundo plano
