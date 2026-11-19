@@ -7,6 +7,7 @@ import http from "node:http";
 import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { AsyncLocalStorage } from "node:async_hooks";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // En local lee config.json; en Render (o cualquier host) usa variables de entorno
@@ -206,8 +207,13 @@ async function consultarEstado(e, forzar = false) {
   const c = cacheEstado[k];
   if (!forzar && c && Date.now() - c.ts < TTL_ESTADO) return c;
   const res = await fetchCampus(e.url);
-  const html = res.status === 200 ? await res.text() : "";
-  const guardar = html && !/login\/index\.php/.test(html.slice(0, 4000));
+  let html = res.status === 200 ? await res.text() : "";
+  if (/name="logintoken"|id="login"/i.test(html.slice(0, 6000))) {
+    try { if (campusCreds) await login(campusCreds); } catch {}
+    const r2 = await fetchCampus(e.url);
+    html = r2.status === 200 ? await r2.text() : html;
+  }
+  const guardar = html && !/name="logintoken"|id="login"/i.test(html.slice(0, 6000));
   if (!guardar) { if (c) return c; throw new Error(`actividad ${e.cmid} no accesible`); }
   let det;
   if (e.component === "mod_assign") {
@@ -242,9 +248,9 @@ async function calendarioMes(year, month, forzar = false) {
   if (!forzar && cal && Date.now() - cal.ts < TTL_CALENDARIO) return { eventos: cal.eventos, materias: cal.materias };
   await asegurarSesion();
   const res = await fetchCampus(`${BASE}/calendar/view.php?view=month&year=${year}&month=${month}`);
-  if (res.status !== 200) { await login(); return calendarioMes(year, month, true); }
+  if (res.status !== 200) { if (!campusCreds) throw new Error("No hay sesión de campus"); await login(campusCreds); return calendarioMes(year, month, true); }
   const html = await res.text();
-  if (/name="logintoken"|id="login"/i.test(html.slice(0, 6000))) { await login(); return calendarioMes(year, month, true); }
+  if (/name="logintoken"|id="login"/i.test(html.slice(0, 6000))) { if (!campusCreds) throw new Error("No hay sesión de campus"); await login(campusCreds); return calendarioMes(year, month, true); }
   const eventos = parsearCalendario(html, year, month);
   const materias = parsearMaterias(html);
   calCache.set(k, { ts: Date.now(), eventos, materias });
