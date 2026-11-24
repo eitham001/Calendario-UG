@@ -37,11 +37,15 @@ piden al iniciar sesión y no se guardan en ningún archivo.
 - **Clic en cualquier tarea** (en el calendario, en una pestaña de vista, en
   el detalle del día) la abre en una **pestaña nueva del navegador**,
   directamente en el campus.
-- Botón ⟳ **Actualizar**: re-consulta el campus (úsalo tras entregar o calificar algo).
-- Carga en dos etapas: el calendario aparece al instante (5 s aprox.) y los
-  estados de cada tarea se consultan en el campus en segundo plano
-  («⏳ consultando estados…»). Solo la primera vez toma ~40 s; después todo
-  sale del caché y es instantáneo.
+- **Actualización automática**: el tablero vuelve a consultar el campus cada
+  **5 minutos** (y al volver a la pestaña si pasaron más de 2), sin borrar lo
+  que ya se ve. El botón ⟳ **Actualizar** sigue sirviendo para forzar la
+  re-consulta al instante tras entregar o calificar algo.
+- Carga rápida en dos etapas: el calendario y el estado de las **tareas**
+  aparecen en cuanto se consultan (≈8–15 s la primera vez); el resto
+  (foros/talleres) se completa en segundo plano («⏳ consultando estados…»).
+  Después todo sale del caché y es instantáneo. Las consultas al campus van
+  en paralelo para acortar la espera.
 - En el calendario, los **foros** se muestran con un color distinto (azul claro)
   y **no se incluyen** en los botones de estado. El programa detecta si ya
   respondiste (según la opción «Darse de baja / Suscribirse» del campus) y
