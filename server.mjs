@@ -1,7 +1,8 @@
 // Plataforma Calendario — Campus Virtual U. Guayaquil (Moodle)
 // Servidor Node sin dependencias: inicia sesión en el campus, descarga el
 // calendario mensual y el estado de cada tarea (pendiente / enviada /
-// calificada / vencida). Sirve el tablero en http://localhost:3210
+// calificada / no enviada). Sirve el tablero en http://localhost:3210
+// Cada persona que entra tiene su PROPIA sesión del campus y su propio caché.
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -10,14 +11,22 @@ import { fileURLToPath } from "node:url";
 import { AsyncLocalStorage } from "node:async_hooks";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-// En local lee config.json; en Render (o cualquier host) usa variables de entorno
+// En local solo se lee baseUrl de config.json. Las credenciales se piden
+// siempre en el formulario; nunca se leen de archivo ni de variables de entorno.
 const fileCfg = fs.existsSync(path.join(__dirname, "config.json"))
   ? JSON.parse(fs.readFileSync(path.join(__dirname, "config.json"), "utf8"))
   : {};
 const BASE = (process.env.CAMPUS_URL ?? fileCfg.baseUrl ?? "https://campusvirtual2.ug.edu.ec").replace(/\/$/, "");
 const PORT = process.env.PORT || 3210;
-const sesiones = new Set();
+
+// ── Sesiones de la app (una por persona) ─────────────────────────────────────
+const sesiones = new Map();       // sid → { jar, loggedAt, creds, user, cacheEstado, calCache }
+const ALS = new AsyncLocalStorage();
 function nuevoSid() { return crypto.randomBytes(16).toString("hex"); }
+function crearSesion() {
+  return { jar: new Map(), loggedAt: 0, creds: null, user: "", cacheEstado: {}, calCache: new Map() };
+}
+function sesionActual() { return ALS.getStore(); }
 function parseCookies(req) {
   const out = {};
   for (const part of (req.headers.cookie || "").split(";")) {
@@ -26,23 +35,16 @@ function parseCookies(req) {
   }
   return out;
 }
-function autenticado(req) { const sid = parseCookies(req).sid; return !!sid && sesiones.has(sid); }
 async function leerBody(req) {
   const chunks = [];
   for await (const c of req) chunks.push(c);
   return Buffer.concat(chunks).toString("utf8");
 }
-const CACHE_FILE = path.join(__dirname, "cache-estado.json");
-const TTL_ESTADO = 1 * 3600 * 1000;   // 1 h de vigencia del estado por tarea (más corto para no mostrar datos viejos)
+const TTL_ESTADO = 1 * 3600 * 1000;   // 1 h de vigencia del estado por tarea
 const TTL_CALENDARIO = 30 * 60 * 1000; // 30 min del calendario por mes
 
-// ── Sesión en el campus ──────────────────────────────────────────────────────
-let jar = new Map();
-let loggedAt = 0;
-let campusCreds = null;
-
-const cookieHeader = () => [...jar].map(([k, v]) => `${k}=${v}`).join("; ");
-function saveCookies(res) {
+// ── Sesión en el campus (por sesión de la app) ────────────────────────────────
+function saveCookies(res, jar) {
   for (const c of (res.headers.getSetCookie?.() ?? [])) {
     const [pair] = c.split(";");
     const eq = pair.indexOf("=");
@@ -58,38 +60,51 @@ const decodeEntities = (s = "") => s
   .replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim();
 
 async function fetchCampus(url, { method = "GET", body } = {}) {
+  const s = sesionActual();
+  if (!s) throw new Error("Sin sesión de campus");
   const res = await fetch(url, {
     method,
     redirect: "manual",
-    headers: { Cookie: cookieHeader(), "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0 CalendarioUG" },
+    headers: { Cookie: [...s.jar].map(([k, v]) => `${k}=${v}`).join("; "), "Content-Type": "application/x-www-form-urlencoded", "User-Agent": "Mozilla/5.0 CalendarioUG" },
     body,
   });
-  saveCookies(res);
+  saveCookies(res, s.jar);
   return res;
 }
 
-async function login(creds) {
-  campusCreds = creds;
-  jar = new Map();
+async function login(creds, s) {
+  s.creds = creds;
+  s.jar = new Map();
+  s.cacheEstado = {};
+  s.calCache = new Map();
   const lp = await fetchCampus(`${BASE}/login/index.php`);
   const lpHtml = await lp.text();
   const logintoken = (lpHtml.match(/name="logintoken"\s*value="([^"]+)"/) ?? [])[1] ?? "";
   const body = new URLSearchParams({ username: creds.user, password: creds.pass, logintoken }).toString();
   const resp = await fetchCampus(`${BASE}/login/index.php`, { method: "POST", body });
-  const redir = resp.headers.get("location");
-  if (!redir || redir.includes("login")) {
+  const redir = resp.headers.get("location") ?? "";
+
+  // El campus rechaza credenciales con 303 → /altlogin/index.html?errorcode=3
+  if (/errorcode|altlogin/i.test(redir)) throw new Error("Credenciales rechazadas por el campus");
+  if (redir) {
+    const destino = redir.startsWith("http") ? redir : BASE + redir;
+    const final = await fetchCampus(destino);
+    const html = await final.text();
+    if (/name="logintoken"|<form[^>]*id="login"/i.test(html.slice(0, 6000))) throw new Error("Credenciales rechazadas por el campus");
+  } else {
     const html = await resp.text();
-    if (/Invalid login|Datos incorrectos/i.test(html)) throw new Error("Credenciales rechazadas por el campus");
+    if (/name="logintoken"|id="login"|Invalid login|Datos incorrectos/i.test(html)) throw new Error("Credenciales rechazadas por el campus");
   }
-  if (redir) await fetchCampus(redir);
-  loggedAt = Date.now();
+
+  s.loggedAt = Date.now();
+  s.user = creds.user;
   console.log(`[sesión] conectado como ${creds.user}`);
 }
 
-function sesionValida() { return jar.size > 0 && Date.now() - loggedAt < 50 * 60 * 1000; }
-async function asegurarSesion() {
-  if (!campusCreds) throw new Error("No hay sesión de campus");
-  if (!sesionValida()) await login(campusCreds);
+function sesionValida(s) { return s.jar.size > 0 && Date.now() - s.loggedAt < 50 * 60 * 1000; }
+async function asegurarSesion(s) {
+  if (!s.creds) throw new Error("No hay sesión de campus");
+  if (!sesionValida(s)) await login(s.creds, s);
 }
 
 // ── Parser del calendario mensual ────────────────────────────────────────────
@@ -97,19 +112,16 @@ const LIMPIEZA_NOMBRE = [
   /^Vencimiento de[:\s]+/i, /^Vencimiento[:\s]+/i, /^Cierre de[:\s]+/i,
   /^\s*fecha l[íi]mite para env[íi]os?$/i, /^\s*fecha l[íi]mite de entrega:?$/i,
 ];
-
 function limpiarNombre(titulo) {
   let s = decodeEntities(titulo).trim();
   for (let i = 0; i < 2; i++) for (const re of LIMPIEZA_NOMBRE) s = s.replace(re, "").trim();
   return s || titulo;
 }
-
 function parsearMaterias(html) {
   return [...html.matchAll(/<option[^>]*value="(\d+)"[^>]*>([^<]+)<\/option>/g)]
     .map(m => ({ id: m[1], nombre: decodeEntities(m[2].replace(/\s+/g, " ").trim()) }))
     .filter(o => o.id !== "1" && o.nombre);
 }
-
 function parsearCalendario(html, year, month) {
   const eventos = [];
   const dias = [...html.matchAll(/<td[^>]*data-region="day"[^>]*>([\s\S]*?)<\/td>/g)];
@@ -127,8 +139,8 @@ function parsearCalendario(html, year, month) {
       eventos.push({
         id: `ev-${cmid}-${eventtype}`,
         cmid,
-        component,                       // mod_assign | mod_workshop | mod_quiz | …
-        tipo: eventtype,                 // due | closesubmission | …
+        component,
+        tipo: eventtype,
         day: dia,
         year, month,
         url: href,
@@ -138,7 +150,7 @@ function parsearCalendario(html, year, month) {
                    component === "mod_quiz" ? "Cuestionario" : "Actividad",
         fecha: `${year}-${String(month).padStart(2, "0")}-${String(dia).padStart(2, "0")}`,
       });
-  }
+    }
   }
   return eventos;
 }
@@ -156,7 +168,6 @@ function parsearCursoDe(html) {
   const bc = [...html.matchAll(/<li class="breadcrumb-item">[\s\S]*?<a[^>]*>([\s\S]*?)<\/a>/g)];
   return bc.length ? decodeEntities(bc[bc.length - 1][1]) : null;
 }
-
 function parsearEstadoAsign(html) {
   const estado = { curso: null, enviado: false, calificada: false, nota: null, tarde: false, freno: null };
   estado.curso = parsearCursoDe(html);
@@ -178,16 +189,11 @@ function parsearEstadoAsign(html) {
   }
   return estado;
 }
-
 function estadoDe(e, det) {
   const hoy = new Date();
   const due = new Date(e.year, e.month - 1, e.day, 23, 59, 59);
   const pasado = due < hoy;
-
-  if (e.component !== "mod_assign") {
-    // Taller / quiz / otros: el campus no expone estado estable aquí → por fecha
-    return { estado: pasado ? "vencida" : "pendiente", sinEstadoExacto: true };
-  }
+  if (e.component !== "mod_assign") return { estado: pasado ? "vencida" : "pendiente", sinEstadoExacto: true };
   if (!det) return { estado: pasado ? "vencida" : "pendiente" };
   let est;
   if (det.calificada) est = "calificada";
@@ -197,38 +203,28 @@ function estadoDe(e, det) {
   return { estado: est, note: det.tarde ? "Entregada después de la fecha límite" : undefined };
 }
 
-// ── Caché de estados ─────────────────────────────────────────────────────────
-let cacheEstado = {};
-try { cacheEstado = JSON.parse(fs.readFileSync(CACHE_FILE, "utf8")); } catch {}
-const guardarCache = () => fs.writeFileSync(CACHE_FILE, JSON.stringify(cacheEstado, null, 1));
-
-async function consultarEstado(e, forzar = false) {
+// ── Caché por sesión (nunca se comparte entre personas) ───────────────────────
+async function consultarEstado(e, s, forzar = false) {
   const k = String(e.cmid);
-  const c = cacheEstado[k];
+  const c = s.cacheEstado[k];
   if (!forzar && c && Date.now() - c.ts < TTL_ESTADO) return c;
   const res = await fetchCampus(e.url);
   let html = res.status === 200 ? await res.text() : "";
-  if (/name="logintoken"|id="login"/i.test(html.slice(0, 6000))) {
-    try { if (campusCreds) await login(campusCreds); } catch {}
+  if (/name="logintoken"|<form[^>]*id="login"/i.test(html.slice(0, 6000))) {
+    try { if (s.creds) await login(s.creds, s); } catch {}
     const r2 = await fetchCampus(e.url);
     html = r2.status === 200 ? await r2.text() : html;
   }
-  const guardar = html && !/name="logintoken"|id="login"/i.test(html.slice(0, 6000));
+  const guardar = html && !/name="logintoken"|<form[^>]*id="login"/i.test(html.slice(0, 6000));
   if (!guardar) { if (c) return c; throw new Error(`actividad ${e.cmid} no accesible`); }
   let det;
-  if (e.component === "mod_assign") {
-    det = parsearEstadoAsign(html);
-  } else if (e.component === "mod_forum") {
-    det = parsearEstadoForum(html);
-  } else {
-    // Taller / quiz / otro: solo el curso (el estado exacto no es fiable aquí)
-    det = { curso: parsearCursoDe(html) };
-  }
-  cacheEstado[k] = { ts: Date.now(), det };
-  return cacheEstado[k];
+  if (e.component === "mod_assign") det = parsearEstadoAsign(html);
+  else if (e.component === "mod_forum") det = parsearEstadoForum(html);
+  else det = { curso: parsearCursoDe(html) };
+  s.cacheEstado[k] = { ts: Date.now(), det };
+  return s.cacheEstado[k];
 }
 
-// Cola de peticiones con límite de concurrencia (no saturar el campus)
 async function enParalelo(items, fn, tam = 4) {
   const out = new Array(items.length);
   let i = 0;
@@ -239,34 +235,26 @@ async function enParalelo(items, fn, tam = 4) {
   return out;
 }
 
-// ── Calendario de un mes (con caché) ─────────────────────────────────────────
-const calCache = new Map(); // "y-m" → { ts, eventos }
-function fechaVenc(e) { return new Date(e.year, e.month - 1, e.day, 23, 59, 59); }
-async function calendarioMes(year, month, forzar = false) {
+async function calendarioMes(year, month, s, forzar = false) {
   const k = `${year}-${month}`;
-  let cal = calCache.get(k);
+  const cal = s.calCache.get(k);
   if (!forzar && cal && Date.now() - cal.ts < TTL_CALENDARIO) return { eventos: cal.eventos, materias: cal.materias };
-  await asegurarSesion();
+  await asegurarSesion(s);
   const res = await fetchCampus(`${BASE}/calendar/view.php?view=month&year=${year}&month=${month}`);
-  if (res.status !== 200) { if (!campusCreds) throw new Error("No hay sesión de campus"); await login(campusCreds); return calendarioMes(year, month, true); }
+  if (res.status !== 200) { await login(s.creds, s); return calendarioMes(year, month, s, true); }
   const html = await res.text();
-  if (/name="logintoken"|id="login"/i.test(html.slice(0, 6000))) { if (!campusCreds) throw new Error("No hay sesión de campus"); await login(campusCreds); return calendarioMes(year, month, true); }
+  if (/name="logintoken"|<form[^>]*id="login"/i.test(html.slice(0, 6000))) { await login(s.creds, s); return calendarioMes(year, month, s, true); }
   const eventos = parsearCalendario(html, year, month);
   const materias = parsearMaterias(html);
-  calCache.set(k, { ts: Date.now(), eventos, materias });
+  s.calCache.set(k, { ts: Date.now(), eventos, materias });
   return { eventos, materias };
 }
 
-// Aplica estados a los eventos: desde caché, y opcionalmente consultando en el
-// campus solo las tareas que faltan (resolver) o todas (forzarEstado).
-async function aplicarEstados(eventos, { resolver = false, forzarEstado = false } = {}) {
-  const faltantes = eventos.filter(e => !cacheEstado[String(e.cmid)] || forzarEstado);
-  if (resolver && faltantes.length) {
-    await enParalelo(faltantes, (e) => consultarEstado(e, forzarEstado), 8);
-    guardarCache();
-  }
+async function aplicarEstados(eventos, s, { resolver = false, forzarEstado = false } = {}) {
+  const faltantes = eventos.filter(e => !s.cacheEstado[String(e.cmid)] || forzarEstado);
+  if (resolver && faltantes.length) await enParalelo(faltantes, (e) => consultarEstado(e, s, forzarEstado), 8);
   for (const e of eventos) {
-    const cached = cacheEstado[String(e.cmid)];
+    const cached = s.cacheEstado[String(e.cmid)];
     const det = cached ? cached.det : null;
     if (det) {
       if (det.curso) e.curso = det.curso;
@@ -327,10 +315,33 @@ if (location.search.includes("error=1")) document.getElementById("err").classLis
 </body>
 </html>`;
 
+async function manejarAutenticado(req, res, u, s) {
+  if (u.pathname === "/api/calendario" || u.pathname === "/api/estados" || u.pathname === "/api/refrescar") {
+    const y = Number(u.searchParams.get("year")) || new Date().getFullYear();
+    const m = Number(u.searchParams.get("month")) || new Date().getMonth() + 1;
+    const cal = await calendarioMes(y, m, s, u.pathname === "/api/refrescar");
+    await aplicarEstados(cal.eventos, s, {
+      resolver: u.pathname !== "/api/calendario",
+      forzarEstado: u.pathname === "/api/refrescar",
+    });
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ eventos: cal.eventos, materias: cal.materias, generadosEn: Date.now() }));
+    return;
+  }
+  let file = u.pathname === "/" ? "/index.html" : u.pathname;
+  file = file.replace(/\.\./g, "");
+  const abs = path.join(PUBLICO, file);
+  if (fs.existsSync(abs) && fs.statSync(abs).isFile()) {
+    res.writeHead(200, { "Content-Type": MIME[path.extname(abs)] ?? "application/octet-stream", "Cache-Control": "no-store" });
+    res.end(fs.readFileSync(abs));
+    return;
+  }
+  res.writeHead(404); res.end("No encontrado");
+}
+
 const server = http.createServer(async (req, res) => {
   const u = new URL(req.url, `http://localhost:${PORT}`);
   try {
-    // --- Login / logout ---
     if (u.pathname === "/login") {
       if (req.method === "GET") {
         res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
@@ -338,22 +349,23 @@ const server = http.createServer(async (req, res) => {
         return;
       }
       if (req.method === "POST") {
-        const body = await leerBody(req);
-        const params = new URLSearchParams(body);
-        const user = params.get("user") ?? "";
-        const pass = params.get("pass") ?? "";
+        const params = new URLSearchParams(await leerBody(req));
+        const creds = { user: params.get("user") ?? "", pass: params.get("pass") ?? "" };
+        const s = crearSesion();
         try {
-          await login({ user, pass });
-          const sid = nuevoSid();
-          sesiones.add(sid);
-          res.writeHead(302, {
-            "Set-Cookie": `sid=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`,
-            "Location": "/",
-          });
+          await ALS.run(s, () => login(creds, s));
         } catch (e) {
-          campusCreds = null;
+          console.log(`[sesión] rechazado: ${creds.user} — ${e.message}`);
           res.writeHead(302, { "Location": "/login?error=1" });
+          res.end();
+          return;
         }
+        const sid = nuevoSid();
+        sesiones.set(sid, s);
+        res.writeHead(302, {
+          "Set-Cookie": `sid=${sid}; HttpOnly; SameSite=Lax; Path=/; Max-Age=86400`,
+          "Location": "/",
+        });
         res.end();
         return;
       }
@@ -361,7 +373,6 @@ const server = http.createServer(async (req, res) => {
     if (u.pathname === "/logout") {
       const sid = parseCookies(req).sid;
       if (sid) sesiones.delete(sid);
-      campusCreds = null;
       res.writeHead(302, {
         "Set-Cookie": "sid=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0",
         "Location": "/login",
@@ -369,41 +380,19 @@ const server = http.createServer(async (req, res) => {
       res.end();
       return;
     }
-    // --- Guardia de autenticación ---
-    if (!autenticado(req)) {
+    const sid = parseCookies(req).sid;
+    const s = sesiones.get(sid);
+    if (!s) {
       if (u.pathname.startsWith("/api/")) {
         res.writeHead(401, { "Content-Type": "application/json; charset=utf-8" });
         res.end(JSON.stringify({ error: "No autenticado" }));
-        return;
+      } else {
+        res.writeHead(302, { "Location": "/login" });
+        res.end();
       }
-      res.writeHead(302, { "Location": "/login" });
-      res.end();
       return;
     }
-    if (u.pathname === "/api/calendario" || u.pathname === "/api/estados" || u.pathname === "/api/refrescar") {
-      const y = Number(u.searchParams.get("year")) || new Date().getFullYear();
-      const m = Number(u.searchParams.get("month")) || new Date().getMonth() + 1;
-      // /api/calendario  → solo el calendario + estados ya cacheados (rápido)
-      // /api/estados     → consulta el campus solo lo que falta (1.ª vez: lento)
-      // /api/refrescar   → recalcula todo el mes y re-verifica cada tarea
-      const cal = await calendarioMes(y, m, u.pathname === "/api/refrescar");
-      await aplicarEstados(cal.eventos, {
-        resolver: u.pathname !== "/api/calendario",
-        forzarEstado: u.pathname === "/api/refrescar",
-      });
-      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ eventos: cal.eventos, materias: cal.materias, generadosEn: Date.now() }));
-      return;
-    }
-    let file = u.pathname === "/" ? "/index.html" : u.pathname;
-    file = file.replace(/\.\./g, "");
-    const abs = path.join(PUBLICO, file);
-    if (fs.existsSync(abs) && fs.statSync(abs).isFile()) {
-      res.writeHead(200, { "Content-Type": MIME[path.extname(abs)] ?? "application/octet-stream", "Cache-Control": "no-store" });
-      res.end(fs.readFileSync(abs));
-      return;
-    }
-    res.writeHead(404); res.end("No encontrado");
+    await ALS.run(s, () => manejarAutenticado(req, res, u, s));
   } catch (err) {
     console.error("[http]", err);
     res.writeHead(500, { "Content-Type": "application/json; charset=utf-8" });

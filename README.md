@@ -8,7 +8,7 @@ y muestra tus fechas límite con su **estado real**:
 | 🟡 **Pendiente** | La tarea aún no se entrega y no venció |
 | 🟢 **Enviada** | Entregada en el campus (muestra ⚠️ si fue fuera de plazo) |
 | 🔵 **Calificada** | El docente ya subió la nota (visible en el detalle del día) |
-| 🔴 **Vencida** | No fue entregada y la fecha límite ya pasó |
+| 🔴 **No enviada** | No fue entregada y la fecha límite ya pasó |
 
 ## Cómo usarlo
 
@@ -27,12 +27,8 @@ piden al iniciar sesión y no se guardan en ningún archivo.
 ## Funciones
 
 - Calendario mensual navegable (◀ ▶ / botón «Hoy»), con el día actual resaltado.
-- **Botón 📋 Lista**: abre un panel lateral derecho con todas las actividades
-  agrupadas por estado — **Pendientes, Atrasadas (entregadas fuera de plazo),
-  Enviadas, Calificadas (con nota) y Vencidas** — ordenadas por fecha.
-  Clic en cualquier elemento abre la actividad en el campus; ✕ cierra el panel.
 - **Pestañas de vista** (encima del calendario): los **botones por estado**
-  (Pendientes / Atrasadas / Enviadas / Calificadas / Vencidas), **por curso**
+  (Pendientes / Atrasadas / Enviadas / Calificadas / No enviadas), **por curso**
   y **Foros / Talleres** (actividades que el campus no expone con estado fiable:
   se marcan como «Revisar en el campus») abren cada uno su **propia pestaña**,
   donde las tareas aparecen en lista (ordenadas por fecha, con su etiqueta de
@@ -56,7 +52,13 @@ piden al iniciar sesión y no se guardan en ningún archivo.
 ## Datos
 
 - No se guardan credenciales en ningún archivo: el login valida tu usuario y
-  contraseña directamente contra el campus virtual.
+  contraseña directamente contra el campus virtual. Si las credenciales son
+  incorrectas, el campus las rechaza y la app no entra.
+- **Cada persona tiene su propia sesión**: las cookies del campus, los estados
+  consultados y el calendario se guardan por separado para cada usuario que
+  inicia sesión. Dos compañeros pueden usar el tablero al mismo tiempo sin ver
+  las tareas del otro. El caché vive en memoria y se borra al cerrar la app o al
+  volver a entrar.
 - El estado se lee de la página de cada tarea de Moodle. Para
   **talleres y cuestionarios** el campus no expone estado estable, así que se marca
   solo por fecha (pendiente/vencida); su estado exacto se ve directamente en el campus.
@@ -82,7 +84,6 @@ el campus virtual; no se guarda ninguna credencial en el servidor.
 ```
 Universidad/
 ├─ server.mjs         ← servidor Node (sin dependencias) + conexión al campus
-├─ cache-estado.json  ← caché de estados (se genera solo)
 ├─ package.json       ← scripts/engines para hosts (Render, etc.)
 ├─ .gitignore
 └─ public/index.html  ← tablero (calendario, filtros, detalle)
