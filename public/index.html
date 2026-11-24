@@ -211,6 +211,7 @@ let diaSel = null;
 /* límite: guardamos "mes actual como visto" para arrancar siempre acá */
 let visto = { y: ref.getFullYear(), m: ref.getMonth()+1 };
 localStorage.setItem(GUARDADOS, JSON.stringify(visto));
+let ultimaUpdate = 0;
 
 const $ = (s) => document.querySelector(s);
 
@@ -230,14 +231,15 @@ async function cargar(forzar = false) {
   const data = await r.json();
   eventos = data.eventos;
   materias = data.materias ?? [];
-  if (!forzar) { pintarTodo(); await completarEstados(); return; }
+  ultimaUpdate = Date.now();
+  if (!forzar) { pintarTodo(); completarEstados(); return; }
   pintarTodo();
 }
 
 /* 2.ª etapa: resuelve en el campus el estado de las tareas sin caché */
 async function completarEstados() {
   const aviso = $("#estado-carga");
-  const faltan = eventos.some(e => e.component === "mod_assign" ? e.sinEstadoExacto : !e.curso);
+  const faltan = eventos.some(e => !e.detalleCargado);
   if (!faltan) return;
   aviso.hidden = false;
   const mesPedido = { ...visto };
@@ -252,6 +254,28 @@ async function completarEstados() {
     }
   } catch {} finally { aviso.hidden = true; }
 }
+
+/* actualización automática en segundo plano: no borra lo que ya se ve */
+async function autoActualizar(){
+  if (document.hidden) return;
+  const pedido = { ...visto };
+  try {
+    const r = await fetch(`/api/refrescar?year=${pedido.y}&month=${pedido.m}`);
+    if (r.status === 401) { location.href = "/login"; return; }
+    if (!r.ok) return;
+    const data = await r.json();
+    if (visto.y === pedido.y && visto.m === pedido.m) {
+      eventos = data.eventos;
+      materias = data.materias ?? materias;
+      ultimaUpdate = Date.now();
+      pintarTodo();
+    }
+  } catch {}
+}
+setInterval(autoActualizar, 5 * 60 * 1000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && Date.now() - ultimaUpdate > 2 * 60 * 1000) autoActualizar();
+});
 
 function pintarTodo(){ pintaBotones(); pintaCalendario(); pintarVistas(); pintaDetalle(); }
 

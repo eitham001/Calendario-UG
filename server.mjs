@@ -122,7 +122,7 @@ function parsearMaterias(html) {
     .map(m => ({ id: m[1], nombre: decodeEntities(m[2].replace(/\s+/g, " ").trim()) }))
     .filter(o => o.id !== "1" && o.nombre);
 }
-function parsearCalendario(html, year, month) {
+function parsearCalendario(html, year, month, cursoPorId = new Map()) {
   const eventos = [];
   const dias = [...html.matchAll(/<td[^>]*data-region="day"[^>]*>([\s\S]*?)<\/td>/g)];
   for (const [, td] of dias) {
@@ -136,7 +136,9 @@ function parsearCalendario(html, year, month) {
       const title = (li.match(/title="([^"]*)"/) ?? [])[1] ?? "";
       if (!href) continue;
       const cmid = Number((href.match(/[?&]id=(\d+)/) ?? [])[1]);
+      const cid = (liAttrs.match(/data-event-courseid="(\d+)"/) ?? [])[1];
       eventos.push({
+        curso: cursoPorId.get(cid) ?? null,
         id: `ev-${cmid}-${eventtype}`,
         cmid,
         component,
@@ -225,7 +227,7 @@ async function consultarEstado(e, s, forzar = false) {
   return s.cacheEstado[k];
 }
 
-async function enParalelo(items, fn, tam = 4) {
+async function enParalelo(items, fn, tam = 16) {
   const out = new Array(items.length);
   let i = 0;
   const workers = Array.from({ length: Math.min(tam, items.length) }, async () => {
@@ -244,18 +246,22 @@ async function calendarioMes(year, month, s, forzar = false) {
   if (res.status !== 200) { await login(s.creds, s); return calendarioMes(year, month, s, true); }
   const html = await res.text();
   if (/name="logintoken"|<form[^>]*id="login"/i.test(html.slice(0, 6000))) { await login(s.creds, s); return calendarioMes(year, month, s, true); }
-  const eventos = parsearCalendario(html, year, month);
   const materias = parsearMaterias(html);
+  const cursoPorId = new Map(materias.map(m => [m.id, m.nombre]));
+  const eventos = parsearCalendario(html, year, month, cursoPorId);
   s.calCache.set(k, { ts: Date.now(), eventos, materias });
   return { eventos, materias };
 }
 
-async function aplicarEstados(eventos, s, { resolver = false, forzarEstado = false } = {}) {
-  const faltantes = eventos.filter(e => !s.cacheEstado[String(e.cmid)] || forzarEstado);
-  if (resolver && faltantes.length) await enParalelo(faltantes, (e) => consultarEstado(e, s, forzarEstado), 8);
+async function aplicarEstados(eventos, s, { resolver = false, forzarEstado = false, soloTareas = false } = {}) {
+  const faltantes = eventos.filter(e =>
+    (!soloTareas || e.component === "mod_assign") &&
+    (!s.cacheEstado[String(e.cmid)] || forzarEstado));
+  if (resolver && faltantes.length) await enParalelo(faltantes, (e) => consultarEstado(e, s, forzarEstado), 16);
   for (const e of eventos) {
     const cached = s.cacheEstado[String(e.cmid)];
     const det = cached ? cached.det : null;
+    e.detalleCargado = !!det;
     if (det) {
       if (det.curso) e.curso = det.curso;
       e.nota = det.nota; e.tarde = det.tarde;
@@ -321,7 +327,8 @@ async function manejarAutenticado(req, res, u, s) {
     const m = Number(u.searchParams.get("month")) || new Date().getMonth() + 1;
     const cal = await calendarioMes(y, m, s, u.pathname === "/api/refrescar");
     await aplicarEstados(cal.eventos, s, {
-      resolver: u.pathname !== "/api/calendario",
+      resolver: true,
+      soloTareas: u.pathname === "/api/calendario",
       forzarEstado: u.pathname === "/api/refrescar",
     });
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
