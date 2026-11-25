@@ -10,6 +10,21 @@ y muestra tus fechas límite con su **estado real**:
 | 🔵 **Calificada** | El docente ya subió la nota (visible en el detalle del día) |
 | 🔴 **No enviada** | No fue entregada y la fecha límite ya pasó |
 
+## Verlo dentro del Campus Virtual (sin iniciar sesión otra vez)
+
+Si ya estás logueado en el campus, puedes mostrar el tablero **dentro de la
+propia página del campus** con el userscript `calendario-ug.user.js`:
+
+1. Instala **Tampermonkey** en tu navegador (extensión gratuita).
+2. Abre el panel de Tampermonkey → **Crear un script nuevo**.
+3. Borra todo el contenido y pega el archivo `calendario-ug.user.js` completo.
+4. Guarda (Ctrl+S) y abre el campus. Aparecerá un panel **📅 Calendario UG** arriba a la derecha.
+
+El script corre en tu navegador con tu sesión actual: **no pide usuario ni
+contraseña**, no modifica el sitio de la UG y no guarda credenciales. Lee el
+mismo calendario y las mismas páginas de tareas que tu navegador ya descarga.
+Tiene filtros por estado/curso, navegación de mes y se actualiza solo cada 10 min.
+
 ## Cómo usarlo
 
 ```bash
