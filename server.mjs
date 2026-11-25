@@ -40,8 +40,8 @@ async function leerBody(req) {
   for await (const c of req) chunks.push(c);
   return Buffer.concat(chunks).toString("utf8");
 }
-const TTL_ESTADO = 1 * 3600 * 1000;   // 1 h de vigencia del estado por tarea
-const TTL_CALENDARIO = 30 * 60 * 1000; // 30 min del calendario por mes
+const TTL_ESTADO = 5 * 60 * 1000;     // 5 min de vigencia del estado por tarea
+const TTL_CALENDARIO = 15 * 60 * 1000; // 15 min del calendario por mes
 
 // ── Sesión en el campus (por sesión de la app) ────────────────────────────────
 function saveCookies(res, jar) {
@@ -227,7 +227,7 @@ async function consultarEstado(e, s, forzar = false) {
   return s.cacheEstado[k];
 }
 
-async function enParalelo(items, fn, tam = 16) {
+async function enParalelo(items, fn, tam = 24) {
   const out = new Array(items.length);
   let i = 0;
   const workers = Array.from({ length: Math.min(tam, items.length) }, async () => {
@@ -257,7 +257,7 @@ async function aplicarEstados(eventos, s, { resolver = false, forzarEstado = fal
   const faltantes = eventos.filter(e =>
     (!soloTareas || e.component === "mod_assign") &&
     (!s.cacheEstado[String(e.cmid)] || forzarEstado));
-  if (resolver && faltantes.length) await enParalelo(faltantes, (e) => consultarEstado(e, s, forzarEstado), 16);
+  if (resolver && faltantes.length) await enParalelo(faltantes, (e) => consultarEstado(e, s, forzarEstado), 24);
   for (const e of eventos) {
     const cached = s.cacheEstado[String(e.cmid)];
     const det = cached ? cached.det : null;
@@ -325,11 +325,14 @@ async function manejarAutenticado(req, res, u, s) {
   if (u.pathname === "/api/calendario" || u.pathname === "/api/estados" || u.pathname === "/api/refrescar") {
     const y = Number(u.searchParams.get("year")) || new Date().getFullYear();
     const m = Number(u.searchParams.get("month")) || new Date().getMonth() + 1;
-    const cal = await calendarioMes(y, m, s, u.pathname === "/api/refrescar");
+    const ep = u.pathname;
+    const cal = await calendarioMes(y, m, s, ep === "/api/refrescar");
     await aplicarEstados(cal.eventos, s, {
-      resolver: true,
-      soloTareas: u.pathname === "/api/calendario",
-      forzarEstado: u.pathname === "/api/refrescar",
+      // /api/calendario responde al instante (solo caché); /api/estados resuelve
+      // lo que faltó; /api/refrescar fuerza todo. Así el tablero pinta primero.
+      resolver: ep === "/api/estados" || ep === "/api/refrescar",
+      soloTareas: false,
+      forzarEstado: ep === "/api/refrescar",
     });
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ eventos: cal.eventos, materias: cal.materias, generadosEn: Date.now() }));

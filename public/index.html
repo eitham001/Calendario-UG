@@ -219,11 +219,10 @@ async function cargar(forzar = false) {
   const tabla = $("#tabla");
   tabla.innerHTML = `<tr><td class="tmp">…</td></tr>`;
   $("#panel-detalle").hidden = true;
-  const ep = forzar ? `/api/refrescar` : `/api/calendario`;
   let r = null, err = null;
   for (let intento = 0; intento < 3; intento++) {
-    try { r = await fetch(`${ep}?year=${visto.y}&month=${visto.m}`); break; }
-    catch (e) { err = e; await new Promise(x => setTimeout(x, 2500)); }
+    try { r = await fetch(`/api/calendario?year=${visto.y}&month=${visto.m}`); break; }
+    catch (e) { err = e; await new Promise(x => setTimeout(x, 1200)); }
   }
   if (!r) { tabla.innerHTML = `<tr><td style="color:var(--vencida);text-align:center;padding:30px">No se pudo conectar. ¿Está corriendo «node server.mjs»? Reintentando al navegar de mes.</td></tr>`; return; }
   if (r.status === 401) { location.href = "/login"; return; }
@@ -232,27 +231,32 @@ async function cargar(forzar = false) {
   eventos = data.eventos;
   materias = data.materias ?? [];
   ultimaUpdate = Date.now();
-  if (!forzar) { pintarTodo(); completarEstados(); return; }
+  // Pintamos de inmediato y los estados llegan en segundo plano.
   pintarTodo();
+  completarEstados(forzar);
 }
 
-/* 2.ª etapa: resuelve en el campus el estado de las tareas sin caché */
-async function completarEstados() {
+/* 2.ª etapa (segundo plano): estados reales, sin bloquear el tablero */
+let resolviendo = false;
+async function completarEstados(forzar = false) {
+  if (resolviendo) return;
+  resolviendo = true;
   const aviso = $("#estado-carga");
-  const faltan = eventos.some(e => !e.detalleCargado);
-  if (!faltan) return;
   aviso.hidden = false;
   const mesPedido = { ...visto };
+  const ep = forzar ? "/api/refrescar" : "/api/estados";
   try {
-    const r = await fetch(`/api/estados?year=${mesPedido.y}&month=${mesPedido.m}`);
+    const r = await fetch(`${ep}?year=${mesPedido.y}&month=${mesPedido.m}`);
     if (r.status === 401) { location.href = "/login"; return; }
     if (r.ok) {
       const data = await r.json();
-      const nuevos = data.eventos;
-      materias = data.materias ?? materias;
-      if (visto.y === mesPedido.y && visto.m === mesPedido.m) { eventos = nuevos; pintarTodo(); }
+      if (visto.y === mesPedido.y && visto.m === mesPedido.m) {
+        eventos = data.eventos;
+        materias = data.materias ?? materias;
+        pintarTodo();
+      }
     }
-  } catch {} finally { aviso.hidden = true; }
+  } catch {} finally { resolviendo = false; aviso.hidden = true; }
 }
 
 /* actualización automática en segundo plano: no borra lo que ya se ve */
@@ -260,7 +264,8 @@ async function autoActualizar(){
   if (document.hidden) return;
   const pedido = { ...visto };
   try {
-    const r = await fetch(`/api/refrescar?year=${pedido.y}&month=${pedido.m}`);
+    // Solo el calendario (rápido, en caché); los estados van aparte.
+    const r = await fetch(`/api/calendario?year=${pedido.y}&month=${pedido.m}`);
     if (r.status === 401) { location.href = "/login"; return; }
     if (!r.ok) return;
     const data = await r.json();
@@ -271,10 +276,11 @@ async function autoActualizar(){
       pintarTodo();
     }
   } catch {}
+  completarEstados();
 }
-setInterval(autoActualizar, 5 * 60 * 1000);
+setInterval(autoActualizar, 3 * 60 * 1000);
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && Date.now() - ultimaUpdate > 2 * 60 * 1000) autoActualizar();
+  if (!document.hidden && Date.now() - ultimaUpdate > 60 * 1000) autoActualizar();
 });
 
 function pintarTodo(){ pintaBotones(); pintaCalendario(); pintarVistas(); pintaDetalle(); }
