@@ -163,16 +163,6 @@ td.hoyno{cursor:pointer}
 .sec[data-e="vencida"] .li-e .vence{color:var(--vencida)}
 .li-e .n{color:var(--azul);font-weight:700}
 .lista-vacia{padding:18px 16px;color:var(--muted);font-size:.82rem;text-align:center}
-/* modal del feed .ics */
-.modal-feed{position:fixed;inset:0;background:rgba(10,20,40,.55);display:flex;align-items:center;justify-content:center;padding:20px;z-index:50}
-.modal-feed[hidden]{display:none}
-.modal-feed-card{background:#fff;border-radius:14px;padding:24px;max-width:540px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.25)}
-.modal-feed-card h2{font-size:1.1rem;margin-bottom:8px}
-.modal-feed-card p{font-size:.85rem;color:var(--muted);line-height:1.5;margin-bottom:14px}
-.modal-feed-card input{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:8px;font-size:.82rem}
-.modal-feed-acc{display:flex;gap:10px;justify-content:flex-end;margin-top:16px}
-.modal-feed-acc .boton{background:var(--azul);color:#fff;border:1px solid transparent;border-radius:10px;padding:8px 16px;font-size:.85rem}
-.modal-feed-acc .boton:hover{filter:brightness(1.08)}
 </style>
 </head>
 <body>
@@ -180,7 +170,6 @@ td.hoyno{cursor:pointer}
   <h1>📅 Calendario académico<span class="sub">Campus Virtual — U. Guayaquil · conectado</span></h1>
   <div class="spacer"></div>
   <button class="boton solid" id="btn-refrescar">⟳ Actualizar</button>
-  <button class="boton" id="btn-feed" title="URL para el campus">📆 Feed ICS</button>
   <a class="boton" href="/logout" title="Cerrar sesión" style="text-decoration:none">🚪 Salir</a>
 </header>
 
@@ -209,18 +198,6 @@ td.hoyno{cursor:pointer}
 
 </main>
 
-<div class="modal-feed" id="modal-feed" hidden>
-  <div class="modal-feed-card">
-    <h2>📆 Calendario dentro del Campus Virtual</h2>
-    <p>Copia esta URL y pégala en el campus: <b>Calendario → Importar o exportar calendarios → Importar calendario</b>. El campus la actualizará solo (diario).</p>
-    <input id="feed-url" readonly>
-    <div class="modal-feed-acc">
-      <button class="boton" id="feed-cerrar">Cerrar</button>
-      <button class="boton" id="feed-copiar">Copiar</button>
-    </div>
-  </div>
-</div>
-
 <script>
 const NOMBRES_MES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const NOMBRES_DIA = ["Domingo","Lunes","Martes","Miércoles","Jueves","Viernes","Sábado"];
@@ -235,7 +212,6 @@ let diaSel = null;
 let visto = { y: ref.getFullYear(), m: ref.getMonth()+1 };
 localStorage.setItem(GUARDADOS, JSON.stringify(visto));
 let ultimaUpdate = 0;
-let feedToken = null;
 
 const $ = (s) => document.querySelector(s);
 
@@ -255,7 +231,6 @@ async function cargar(forzar = false) {
   const data = await r.json();
   eventos = data.eventos;
   materias = data.materias ?? [];
-  feedToken = data.feedToken ?? feedToken;
   ultimaUpdate = Date.now();
   if (!forzar) { pintarTodo(); completarEstados(); return; }
   pintarTodo();
@@ -275,7 +250,6 @@ async function completarEstados() {
       const data = await r.json();
       const nuevos = data.eventos;
       materias = data.materias ?? materias;
-      feedToken = data.feedToken ?? feedToken;
       if (visto.y === mesPedido.y && visto.m === mesPedido.m) { eventos = nuevos; pintarTodo(); }
     }
   } catch {} finally { aviso.hidden = true; }
@@ -293,7 +267,6 @@ async function autoActualizar(){
     if (visto.y === pedido.y && visto.m === pedido.m) {
       eventos = data.eventos;
       materias = data.materias ?? materias;
-      feedToken = data.feedToken ?? feedToken;
       ultimaUpdate = Date.now();
       pintarTodo();
     }
@@ -558,21 +531,6 @@ $("#btn-refrescar").onclick = async (ev) => {
   const b = ev.currentTarget; b.disabled = true; b.textContent = "↻ Consultando…";
   await cargar(true);
   b.disabled = false; b.textContent = "⟳ Actualizar";
-};
-
-/* ── URL del feed .ics para el campus ── */
-$("#btn-feed").onclick = () => {
-  if (!feedToken) return;
-  $("#feed-url").value = location.origin + "/feed/" + feedToken + ".ics";
-  $("#modal-feed").hidden = false;
-};
-$("#feed-cerrar").onclick = () => { $("#modal-feed").hidden = true; };
-$("#modal-feed").onclick = (e) => { if (e.target.id === "modal-feed") $("#modal-feed").hidden = true; };
-$("#feed-copiar").onclick = async () => {
-  const inp = $("#feed-url");
-  try { await navigator.clipboard.writeText(inp.value); } catch { inp.select(); document.execCommand("copy"); }
-  const b = $("#feed-copiar"); b.textContent = "✓ Copiado";
-  setTimeout(() => { b.textContent = "Copiar"; }, 1500);
 };
 cargar();
 </script>

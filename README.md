@@ -10,25 +10,20 @@ y muestra tus fechas límite con su **estado real**:
 | 🔵 **Calificada** | El docente ya subió la nota (visible en el detalle del día) |
 | 🔴 **No enviada** | No fue entregada y la fecha límite ya pasó |
 
-## Verlo dentro del Campus Virtual (feed .ics)
+## Verlo dentro del Campus Virtual (sin iniciar sesión otra vez)
 
-La forma de que los eventos aparezcan **en el calendario del propio campus** es
-suscribir un feed iCalendar:
+Si ya estás logueado en el campus, puedes mostrar el tablero **dentro de la
+propia página del campus** con el userscript `calendario-ug.user.js`:
 
-1. Entra al tablero con tu usuario del campus.
-2. Clic en **📆 Feed ICS** → **Copiar**.
-3. En el campus: **Calendario → Importar o exportar calendarios → Importar calendario**.
-   Pega la URL, pon actualización **Diaria** y guarda con el nombre que quieras.
-4. Los eventos aparecerán en el calendario del campus y se actualizarán solos.
+1. Instala **Tampermonkey** en tu navegador (extensión gratuita).
+2. Abre el panel de Tampermonkey → **Crear un script nuevo**.
+3. Borra todo el contenido y pega el archivo `calendario-ug.user.js` completo.
+4. Guarda (Ctrl+S) y abre el campus. Aparecerá un panel **📅 Calendario UG** arriba a la derecha.
 
-Cada persona tiene su propia URL (un token que se guarda en su navegador). El
-servidor guarda en `feeds.json` **solo los eventos** (título, fecha, enlace y
-estado), **nunca credenciales**. Ese archivo está en `.gitignore`.
-
-> El feed muestra título, fecha y descripción. Moodle no entiende los colores ni
-> los botones de estado del tablero; para ver el tablero completo sigue usando
-> la página de la app. (También existe `calendario-ug.user.js`, una opción
-> alternativa con Tampermonkey que muestra el tablero dentro del campus.)
+El script corre en tu navegador con tu sesión actual: **no pide usuario ni
+contraseña**, no modifica el sitio de la UG y no guarda credenciales. Lee el
+mismo calendario y las mismas páginas de tareas que tu navegador ya descarga.
+Tiene filtros por estado/curso, navegación de mes y se actualiza solo cada 10 min.
 
 ## Cómo usarlo
 
