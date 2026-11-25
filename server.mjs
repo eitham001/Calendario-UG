@@ -43,6 +43,58 @@ async function leerBody(req) {
 const TTL_ESTADO = 1 * 3600 * 1000;   // 1 h de vigencia del estado por tarea
 const TTL_CALENDARIO = 30 * 60 * 1000; // 30 min del calendario por mes
 
+// ── Feed iCalendar para suscribirlo desde el campus ──────────────────────────
+// Guarda solo eventos (título/fecha/enlace), NUNCA credenciales. El token lo
+// conserva el navegador en localStorage para que la URL no cambie al reiniciar.
+const FEED_FILE = path.join(__dirname, "feeds.json");
+let feeds = { tokens: {} };
+try { feeds = JSON.parse(fs.readFileSync(FEED_FILE, "utf8")); } catch {}
+function guardarFeeds() {
+  try { fs.writeFileSync(FEED_FILE, JSON.stringify(feeds)); } catch (e) { console.error("[feed]", e.message); }
+}
+function icsEsc(s = "") {
+  return String(s).replace(/\\/g, "\\\\").replace(/;/g, "\\;").replace(/,/g, "\\,").replace(/\r?\n/g, "\\n");
+}
+function actualizarFeed(s, eventos) {
+  if (!s.token) return;
+  const f = feeds.tokens[s.token] ?? (feeds.tokens[s.token] = { eventos: {}, actualizado: 0 });
+  for (const e of eventos) {
+    f.eventos[String(e.id ?? `${e.cmid}-${e.tipo}`)] = {
+      id: e.id, cmid: e.cmid, tipo: e.tipo, titulo: e.titulo, fecha: e.fecha,
+      curso: e.curso || null, actividad: e.actividad || "Actividad",
+      estado: e.estado || null, url: e.url || null,
+    };
+  }
+  const ids = Object.keys(f.eventos);
+  if (ids.length > 300) {
+    ids.sort((a, b) => (f.eventos[a].fecha || "").localeCompare(f.eventos[b].fecha || ""));
+    for (const id of ids.slice(0, ids.length - 300)) delete f.eventos[id];
+  }
+  f.actualizado = Date.now();
+  guardarFeeds();
+}
+function generarICS(token) {
+  const f = feeds.tokens[token];
+  const stamp = new Date(f?.actualizado || Date.now()).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+  const lineas = ["BEGIN:VCALENDAR", "VERSION:2.0", "PRODID:-//Calendario UG//ES", "CALSCALE:GREGORIAN", "METHOD:PUBLISH", "X-WR-CALNAME:Calendario UG"];
+  const evs = Object.values(f?.eventos ?? {}).filter(e => e.fecha).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  for (const e of evs) {
+    const desc = [e.actividad, e.curso, e.estado ? `Estado: ${e.estado}` : "", "Abrir en el campus"].filter(Boolean).join(" — ");
+    lineas.push(
+      "BEGIN:VEVENT",
+      `UID:${icsEsc(`${e.id || e.cmid}-${token}@calendario-ug`)}`,
+      `DTSTAMP:${stamp}`,
+      `DTSTART;VALUE=DATE:${e.fecha.replace(/-/g, "")}`,
+      `SUMMARY:${icsEsc(e.titulo || "Actividad UG")}`,
+      `DESCRIPTION:${icsEsc(desc)}`,
+      ...(e.url ? [`URL:${e.url}`] : []),
+      "END:VEVENT"
+    );
+  }
+  lineas.push("END:VCALENDAR");
+  return lineas.join("\r\n") + "\r\n";
+}
+
 // ── Sesión en el campus (por sesión de la app) ────────────────────────────────
 function saveCookies(res, jar) {
   for (const c of (res.headers.getSetCookie?.() ?? [])) {
@@ -72,7 +124,7 @@ async function fetchCampus(url, { method = "GET", body } = {}) {
   return res;
 }
 
-async function login(creds, s) {
+async function login(creds, s, token) {
   s.creds = creds;
   s.jar = new Map();
   s.cacheEstado = {};
@@ -98,6 +150,7 @@ async function login(creds, s) {
 
   s.loggedAt = Date.now();
   s.user = creds.user;
+  if (token) s.token = token;
   console.log(`[sesión] conectado como ${creds.user}`);
 }
 
@@ -317,6 +370,17 @@ button:hover{filter:brightness(1.05)}
 </form>
 <script>
 if (location.search.includes("error=1")) document.getElementById("err").classList.add("show");
+// Token del feed: se conserva en este navegador para que la URL .ics no cambie.
+(function(){
+  var t = localStorage.getItem("calendario-feed-token");
+  if (!t) {
+    t = Array.from(crypto.getRandomValues(new Uint8Array(16))).map(function(b){return b.toString(16).padStart(2,"0");}).join("");
+    localStorage.setItem("calendario-feed-token", t);
+  }
+  var i = document.createElement("input");
+  i.type = "hidden"; i.name = "feedToken"; i.value = t;
+  document.querySelector("form").appendChild(i);
+})();
 </script>
 </body>
 </html>`;
@@ -331,8 +395,9 @@ async function manejarAutenticado(req, res, u, s) {
       soloTareas: u.pathname === "/api/calendario",
       forzarEstado: u.pathname === "/api/refrescar",
     });
+    actualizarFeed(s, cal.eventos);
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-    res.end(JSON.stringify({ eventos: cal.eventos, materias: cal.materias, generadosEn: Date.now() }));
+    res.end(JSON.stringify({ eventos: cal.eventos, materias: cal.materias, generadosEn: Date.now(), feedToken: s.token || null }));
     return;
   }
   let file = u.pathname === "/" ? "/index.html" : u.pathname;
@@ -358,9 +423,11 @@ const server = http.createServer(async (req, res) => {
       if (req.method === "POST") {
         const params = new URLSearchParams(await leerBody(req));
         const creds = { user: params.get("user") ?? "", pass: params.get("pass") ?? "" };
+        const tokenParam = params.get("feedToken") ?? "";
+        const token = /^[a-f0-9]{32}$/.test(tokenParam) ? tokenParam : crypto.randomBytes(16).toString("hex");
         const s = crearSesion();
         try {
-          await ALS.run(s, () => login(creds, s));
+          await ALS.run(s, () => login(creds, s, token));
         } catch (e) {
           console.log(`[sesión] rechazado: ${creds.user} — ${e.message}`);
           res.writeHead(302, { "Location": "/login?error=1" });
@@ -385,6 +452,13 @@ const server = http.createServer(async (req, res) => {
         "Location": "/login",
       });
       res.end();
+      return;
+    }
+    // Feed público por token (Moodle lo consulta sin cookies de la app)
+    const mf = u.pathname.match(/^\/feed\/([a-f0-9]{32})\.ics$/);
+    if (mf && req.method === "GET") {
+      res.writeHead(200, { "Content-Type": "text/calendar; charset=utf-8", "Cache-Control": "no-store" });
+      res.end(generarICS(mf[1]));
       return;
     }
     const sid = parseCookies(req).sid;
